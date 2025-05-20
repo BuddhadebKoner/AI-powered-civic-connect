@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useSignUp } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IconBrandGithub, IconBrandGoogle } from "@tabler/icons-react";
 
@@ -10,7 +9,6 @@ export default function SignUp() {
    const { isLoaded, signUp } = useSignUp();
    const [error, setError] = useState("");
    const [isSubmitting, setIsSubmitting] = useState(false);
-   const router = useRouter();
 
    const handleOAuthSignUp = async (strategy: "oauth_google" | "oauth_github") => {
       if (!isLoaded || isSubmitting) return;

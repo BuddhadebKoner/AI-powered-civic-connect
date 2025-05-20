@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import Slidebar from './components/shared/Slidebar/Slidebar';
 import Navbar from './components/shared/Navbar/Navbar';
+import Image from 'next/image';
 
 const mockThreads = [
   {
@@ -28,11 +29,25 @@ const mockThreads = [
   },
 ];
 
-const Post = ({ post }) => (
+type PostType = {
+  id: number;
+  user: string;
+  avatar: string;
+  caption: string;
+  images: string[];
+  time: string;
+  likes: number;
+  comments: number;
+};
+
+const Post = ({ post }: { post: PostType }) => (
   <div className="bg-[#181c20] rounded-2xl p-4 mb-6 max-w-2xl mx-auto border border-gray-800 shadow-lg">
     {/* Header */}
     <div className="flex items-center mb-3">
-      <img src={post.avatar} alt="avatar" className="w-10 h-10 rounded-full mr-3" />
+      <Image
+        src={post.avatar}
+        alt="avatar"
+        className="w-10 h-10 rounded-full mr-3" />
       <div>
         <div className="text-white font-medium">{post.user}</div>
         <div className="text-xs text-gray-400">{post.time}</div>
@@ -45,7 +60,7 @@ const Post = ({ post }) => (
     {/* Images */}
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
       {post.images.map((img, index) => (
-        <img
+        <Image
           key={index}
           src={img}
           alt="post"
@@ -74,7 +89,7 @@ const Page = () => {
       <Slidebar />
       <Navbar />
       <main className="max-w-3xl mx-auto pt-24 px-4 pl-20">
-        <h2 className="mb-8 text-2xl font-semibold text-white">What's new?</h2>
+        <h2 className="mb-8 text-2xl font-semibold text-white">What&apos;s new?</h2>
         {posts.map(post => (
           <Post key={post.id} post={post} />
         ))}
