@@ -1,101 +1,82 @@
-"use client";
-import React, { useState } from 'react';
-import Slidebar from './components/shared/Slidebar/Slidebar';
-import Navbar from './components/shared/Navbar/Navbar';
+import { ChevronDown } from 'lucide-react';
 import Image from 'next/image';
+import React from 'react'
 
-const mockThreads = [
-  {
-    id: 1,
-    user: 'sanjana__upadhyay638',
-    avatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-    caption: 'Radhe Radhe 🙏🙏',
-    images: [
-      'https://i.imgur.com/jd6zkTZ.jpg',
-    ],
-    time: '19h',
-    likes: 42,
-    comments: 1,
-  },
-  {
-    id: 2,
-    user: 'amardeepguptakulli',
-    avatar: 'https://randomuser.me/api/portraits/men/45.jpg',
-    caption: 'Jai jai radha raman hari bol #reelshreeradhegovind_dham',
-    images: ['https://i.imgur.com/DAzmsrK.jpg'],
-    time: '3h',
-    likes: 15,
-    comments: 3,
-  },
-];
-
-type PostType = {
-  id: number;
-  user: string;
-  avatar: string;
-  caption: string;
-  images: string[];
-  time: string;
-  likes: number;
-  comments: number;
-};
-
-const Post = ({ post }: { post: PostType }) => (
-  <div className="bg-[#181c20] rounded-2xl p-4 mb-6 max-w-2xl mx-auto border border-gray-800 shadow-lg">
-    {/* Header */}
-    <div className="flex items-center mb-3">
-      <Image
-        src={post.avatar}
-        alt="avatar"
-        className="w-10 h-10 rounded-full mr-3" />
-      <div>
-        <div className="text-white font-medium">{post.user}</div>
-        <div className="text-xs text-gray-400">{post.time}</div>
-      </div>
-    </div>
-
-    {/* Caption */}
-    <div className="text-white text-sm mb-3">{post.caption}</div>
-
-    {/* Images */}
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
-      {post.images.map((img, index) => (
-        <Image
-          key={index}
-          src={img}
-          alt="post"
-          className="w-full rounded-xl object-cover border border-gray-700"
-        />
-      ))}
-    </div>
-
-    {/* Actions */}
-    <div className="flex items-center justify-between text-gray-400 text-sm px-1">
-      <div className="flex items-center gap-3">
-        <span className="hover:text-pink-500 cursor-pointer">❤️ {post.likes}</span>
-        <span className="hover:text-blue-400 cursor-pointer">💬 {post.comments}</span>
-        <span className="hover:text-green-400 cursor-pointer">🔗 Share</span>
-      </div>
-      <span className="text-sm text-gray-600">•••</span>
-    </div>
-  </div>
-);
-
-const Page = () => {
-  const [posts] = useState(mockThreads);
+const HomePage = () => {
+  // Example thread data
+  const threads = [
+    { id: 1, user: 'John Doe', username: '@johndoe', content: 'This is my first thread!', likes: 15, replies: 3, time: '2h ago' },
+    { id: 2, user: 'Jane Smith', username: '@janesmith', content: 'Just joined this platform. Looking forward to connecting!', likes: 24, replies: 7, time: '4h ago' },
+    { id: 3, user: 'Alex Johnson', username: '@alexj', content: 'Working on a new project. Will share details soon!', likes: 42, replies: 12, time: '6h ago' },
+  ];
 
   return (
-    <div className="min-h-screen bg-[#13171a]">
-      <Slidebar />
-      <Navbar />
-      <main className="max-w-3xl mx-auto pt-24 px-4 pl-20">
-        <h2 className="mb-8 text-2xl font-semibold text-white">What&apos;s new?</h2>
-        {posts.map(post => (
-          <Post key={post.id} post={post} />
-        ))}
-      </main>
-    </div>
-  );
-};
+    <div className="max-w-2xl mx-auto pt-8 px-4">
+      <div className="w-full flex items-center justify-center mb-5 gap-3">
+        <p className="font-bold">For You</p>
+        <ChevronDown 
+          size={20} 
+          className="text-icon-disabled cursor-pointer" 
+          strokeWidth={2.25} 
+        />
+      </div>
 
-export default Page;
+      {/* Create thread input */}
+      <div className="mb-8 bg-surface dark:bg-surface p-4 rounded-lg shadow flex gap-5 justify-between items-center">
+        <Image
+          src="https://images.unsplash.com/photo-1728577740843-5f29c7586afe?q=80&w=3880&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+          alt="User Avatar"
+          width={40}
+          height={40}
+          className="rounded-full mr-3 w-10 h-10"
+        />
+        <input
+          type="text"
+          placeholder="What's happening?"
+          className="w-full p-2 rounded-lg focus:outline-none"
+        />
+        <div className="flex justify-end">
+          <button className="px-4 py-2 bg-foreground text-background rounded-xl font-medium hover:bg-surface-hover transition-colors">
+            Post
+          </button>
+        </div>
+      </div>
+
+      {/* Threads feed */}
+      <div className="space-y-4">
+        {threads.map(thread => (
+          <div key={thread.id} className="bg-surface dark:bg-surface p-4 rounded-lg shadow">
+            <div className="flex items-start space-x-3">
+              <div className="w-10 h-10 rounded-full bg-border dark:bg-gray-700 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center space-x-2">
+                  <p className="font-semibold">{thread.user}</p>
+                  <p className="text-icon-disabled text-sm">{thread.username} • {thread.time}</p>
+                </div>
+                <p className="mt-2">{thread.content}</p>
+                <div className="flex items-center space-x-4 mt-3 text-icon-disabled">
+                  <button className="flex items-center space-x-1 hover:text-red-500">
+                    <span>♥</span>
+                    <span>{thread.likes}</span>
+                  </button>
+                  <button className="flex items-center space-x-1 hover:text-foreground">
+                    <span>💬</span>
+                    <span>{thread.replies}</span>
+                  </button>
+                  <button className="hover:text-green-500">
+                    <span>🔄</span>
+                  </button>
+                  <button className="hover:text-foreground">
+                    <span>📤</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default HomePage
