@@ -1,9 +1,17 @@
+'use client';
 import React from 'react'
 
-const page = () => {
+const Page = () => {
+
+
   return (
-    <div>page</div>
+    <>
+      <h1>
+        Create a new thread
+      </h1>
+    </>
   )
 }
 
-export default page
+// Component names should be capitalized in React
+export default Page

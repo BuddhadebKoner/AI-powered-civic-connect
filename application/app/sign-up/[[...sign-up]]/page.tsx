@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { useSignUp } from "@clerk/nextjs";
 import Link from "next/link";
-import { IconBrandGithub, IconBrandGoogle, IconUsers } from "@tabler/icons-react";
+import { IconBrandGoogle, IconBrandFacebook, IconBrandApple, IconUsers } from "@tabler/icons-react";
 
 export default function SignUp() {
    const { isLoaded, signUp } = useSignUp();
    const [error, setError] = useState("");
    const [isSubmitting, setIsSubmitting] = useState(false);
 
-   const handleOAuthSignUp = async (strategy: "oauth_google" | "oauth_github") => {
+   const handleOAuthSignUp = async (strategy: "oauth_google" | "oauth_facebook" | "oauth_apple") => {
       if (!isLoaded || isSubmitting) return;
 
       setIsSubmitting(true);
@@ -70,11 +70,23 @@ export default function SignUp() {
                      opacity: (isSubmitting || !isLoaded) ? "0.7" : "1"
                   }}
                   type="button"
-                  onClick={() => handleOAuthSignUp("oauth_github")}
+                  onClick={() => handleOAuthSignUp("oauth_facebook")}
                   disabled={isSubmitting || !isLoaded}
                >
-                  <IconBrandGithub className="mr-2" size={20} />
-                  Continue with GitHub
+                  <IconBrandFacebook className="mr-2" size={20} />
+                  Continue with Facebook
+               </button>
+               <button
+                  className="w-full py-3 flex items-center justify-center rounded-md transition-all hover:bg-[var(--color-surface-hover)] bg-[var(--color-background)] text-[var(--color-foreground)] border border-[var(--color-border)]"
+                  style={{
+                     opacity: (isSubmitting || !isLoaded) ? "0.7" : "1"
+                  }}
+                  type="button"
+                  onClick={() => handleOAuthSignUp("oauth_apple")}
+                  disabled={isSubmitting || !isLoaded}
+               >
+                  <IconBrandApple className="mr-2" size={20} />
+                  Continue with Apple
                </button>
             </div>
 

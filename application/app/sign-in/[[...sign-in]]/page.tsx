@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { SignOutButton, useSignIn } from "@clerk/nextjs";
 import Link from "next/link";
-import { IconBrandGithub, IconBrandGoogle, IconUsers } from "@tabler/icons-react";
+import { IconBrandGoogle, IconBrandFacebook, IconBrandApple, IconUsers } from "@tabler/icons-react";
 
 export default function SignIn() {
    const { isLoaded, signIn } = useSignIn();
    const [error, setError] = useState("");
    const [loading, setLoading] = useState(false);
 
-   const handleOAuthSignIn = async (strategy: "oauth_google" | "oauth_github") => {
+   const handleOAuthSignIn = async (strategy: "oauth_google" | "oauth_facebook" | "oauth_apple") => {
       if (!isLoaded) return;
       setLoading(true);
       try {
@@ -76,11 +76,23 @@ export default function SignIn() {
                      opacity: loading ? "0.7" : "1"
                   }}
                   type="button"
-                  onClick={() => handleOAuthSignIn("oauth_github")}
+                  onClick={() => handleOAuthSignIn("oauth_facebook")}
                   disabled={loading}
                >
-                  <IconBrandGithub className="mr-2" size={20} />
-                  Continue with GitHub
+                  <IconBrandFacebook className="mr-2" size={20} />
+                  Continue with Facebook
+               </button>
+               <button
+                  className="w-full py-3 flex items-center justify-center rounded-md transition-all hover:bg-[var(--color-surface-hover)] bg-[var(--color-background)] text-[var(--color-foreground)] border border-[var(--color-border)]"
+                  style={{
+                     opacity: loading ? "0.7" : "1"
+                  }}
+                  type="button"
+                  onClick={() => handleOAuthSignIn("oauth_apple")}
+                  disabled={loading}
+               >
+                  <IconBrandApple className="mr-2" size={20} />
+                  Continue with Apple
                </button>
 
                {/* show errors */}
