@@ -10,33 +10,24 @@ import Image from 'next/image'
 
 const Sidebar = () => {
    const { user, isAuthenticated, isLoading } = useUserAuthentication();
-
    const [isOpen, setIsOpen] = useState(false)
    const [isMobile, setIsMobile] = useState(false)
    const pathname = usePathname()
 
-   // Check if current route is active
    const isActive = (path: string) => pathname === path
 
-   // Handle screen resize
    useEffect(() => {
       const checkScreenSize = () => {
          setIsMobile(window.innerWidth < 768)
       }
 
-      // Initial check
       checkScreenSize()
-
-      // Listen for resize events
       window.addEventListener('resize', checkScreenSize)
-
-      // Cleanup
       return () => window.removeEventListener('resize', checkScreenSize)
    }, [])
 
    const toggleMenu = () => {
       setIsOpen(!isOpen)
-      // Fix the overflow logic - only lock scroll when menu is open
       document.body.style.overflow = !isOpen ? 'hidden' : 'auto'
    }
 
@@ -56,16 +47,12 @@ const Sidebar = () => {
       const active = isActive(href)
       const [imageError, setImageError] = useState(false)
 
-      // Render profile image or icon based on authentication state
       const renderContent = () => {
-         // If not a profile item, just render the icon
          if (!isProfile) {
             return <Icon size={24} className={active ? 'text-[var(--color-foreground)]' : 'text-[var(--color-gray-400)]'} />
          }
 
-         // For profile navigation item
          if (isLoading) {
-            // Show loading state
             return (
                <div className="relative w-6 h-6 flex items-center justify-center">
                   <LoaderCircle size={24} className="text-[var(--color-foreground)] animate-spin" />
@@ -73,11 +60,10 @@ const Sidebar = () => {
             )
          }
 
-         if (isAuthenticated && user?.imageUrl && !imageError) {
-            // User is authenticated with valid image
+         if (isAuthenticated && user?.profilePictureUrl && !imageError) {
             return (
                <Image
-                  src={user.imageUrl}
+                  src={user.profilePictureUrl}
                   width={24}
                   height={24}
                   alt="Profile"
@@ -87,7 +73,6 @@ const Sidebar = () => {
             )
          }
 
-         // Fallback to default icon (when not authenticated or no image)
          return <Icon size={24} className={active ? 'text-[var(--color-foreground)]' : 'text-[var(--color-gray-400)]'} />
       }
 
@@ -114,7 +99,6 @@ const Sidebar = () => {
 
    return (
       <>
-         {/* Mobile bottom navigation */}
          {isMobile && (
             <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[var(--color-background)] border-t border-[var(--color-border)] flex items-center justify-around px-2 z-10">
                {navItems.map((item) => (
@@ -129,10 +113,8 @@ const Sidebar = () => {
             </nav>
          )}
 
-         {/* Desktop sidebar */}
          {!isMobile && (
             <aside className="fixed left-0 h-screen w-16 flex flex-col items-center justify-between py-8 bg-[var(--color-background)] border-r border-[var(--color-border)] z-10">
-               {/* Top - Menu */}
                <div>
                   <button
                      onClick={toggleMenu}
@@ -143,7 +125,6 @@ const Sidebar = () => {
                   </button>
                </div>
 
-               {/* Middle - Navigation */}
                <div className="flex flex-col items-center space-y-8">
                   {navItems.map((item) => (
                      <NavItem
@@ -156,12 +137,10 @@ const Sidebar = () => {
                   ))}
                </div>
 
-               {/* Spacer for bottom padding */}
                <div></div>
             </aside>
          )}
 
-         {/* Navbar Popup (Desktop only) */}
          {!isMobile && isOpen && (
             <NavbarPopup
                isOpen={isOpen}
@@ -174,4 +153,4 @@ const Sidebar = () => {
    )
 }
 
-export default Sidebar
+export default Sidebar 

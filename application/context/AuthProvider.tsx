@@ -2,17 +2,11 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import axios from 'axios';
+import { UserTypeContext } from '@/types';
 
-type User = {
-   id: string;
-   name?: string;
-   role?: string;
-   email?: string;
-   imageUrl?: string;
-};
 
 type AuthContextType = {
-   user: User | null;
+   user: UserTypeContext | null;
    isAuthenticated: boolean;
    isLoading: boolean;
    error: string | null;
@@ -24,7 +18,7 @@ const AuthContext = createContext<AuthContextType>({
    isAuthenticated: false,
    isLoading: true,
    error: null,
-   refreshAuth: async () => {},
+   refreshAuth: async () => { },
 });
 
 type AuthProviderProps = {
@@ -32,7 +26,7 @@ type AuthProviderProps = {
 };
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-   const [user, setUser] = useState<User | null>(null);
+   const [user, setUser] = useState<UserTypeContext | null>(null);
    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
    const [isLoading, setIsLoading] = useState<boolean>(true);
    const [error, setError] = useState<string | null>(null);
@@ -43,8 +37,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
          setError(null);
 
          const response = await axios.get(`${window.location.origin}/api/webhook/is-auth`, {
-            withCredentials: true 
+            withCredentials: true
          });
+
+         // console.log('Auth check response:', response.data.userData);
 
          if (response.data.userData) {
             setUser(response.data.userData);

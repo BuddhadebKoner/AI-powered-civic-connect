@@ -18,3 +18,20 @@ export interface PostType {
    likes: number;
    comments: number;
 }
+
+
+export interface UserTypeContext {
+   id: string;
+   email?: string;
+   fullName?: string;
+   bio?: string;
+   username?: string;
+   role?: string;
+   location?: string;
+   profilePictureUrl?: string;
+   postsCount?: number;
+   isPrivateProfile?: boolean;
+   resolvedPostsCount?: number;
+   commentsCount?: number;
+   notificationsCount?: number;
+};

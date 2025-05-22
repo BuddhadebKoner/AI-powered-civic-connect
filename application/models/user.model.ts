@@ -4,14 +4,17 @@ export interface iUser {
    clerkId: string;
    email: string;
    fullName: string;
+   bio: string;
+   username: string;
+   isPrivateProfile: boolean;
    location: string;
    profilePictureUrl: string;
-   profilePictureId: string;
    role: string;
    authorityType: mongoose.Types.ObjectId;
    department: mongoose.Types.ObjectId;
    jurisdiction: mongoose.Types.ObjectId;
    posts: mongoose.Types.ObjectId[];
+   resolvedPosts: mongoose.Types.ObjectId[];
    comments: mongoose.Types.ObjectId[];
    notifications: mongoose.Types.ObjectId[];
 }
@@ -19,7 +22,8 @@ export interface iUser {
 const userSchema = new mongoose.Schema({
    clerkId: {
       type: String,
-      required: true,   
+      required: true,
+      unique: true,
    },
    email: {
       type: String,
@@ -29,18 +33,29 @@ const userSchema = new mongoose.Schema({
       type: String,
       required: true,
    },
+   bio: {
+      type: String,
+      default: "",
+   },
+   username: {
+      type: String,
+      required: true,
+      unique: true,
+   },
+   isPrivateProfile: {
+      type: Boolean,
+      default: false,
+   },
    location: {
       type: String,
    },
    profilePictureUrl: {
       type: String,
    },
-   profilePictureId: {
-      type: String,
-   },
    role: {
       type: String,
       required: true,
+      enum: ["masteradmin", "authority", "user"],
    },
    authorityType: {
       type: mongoose.Types.ObjectId,
@@ -55,6 +70,13 @@ const userSchema = new mongoose.Schema({
       ref: "Jurisdiction",
    },
    posts: [
+      {
+         type: mongoose.Types.ObjectId,
+         ref: "Post",
+         default: [],
+      },
+   ],
+   resolvedPosts: [
       {
          type: mongoose.Types.ObjectId,
          ref: "Post",
