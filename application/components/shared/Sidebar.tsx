@@ -12,6 +12,7 @@ const Sidebar = () => {
    const { user, isAuthenticated, isLoading } = useUserAuthentication();
    const [isOpen, setIsOpen] = useState(false)
    const [isMobile, setIsMobile] = useState(false)
+   const [hapticEnabled, setHapticEnabled] = useState(true)
    const pathname = usePathname()
 
    const isActive = (path: string) => pathname === path
@@ -26,13 +27,27 @@ const Sidebar = () => {
       return () => window.removeEventListener('resize', checkScreenSize)
    }, [])
 
+   // Check if haptic feedback is supported
+   useEffect(() => {
+      setHapticEnabled('vibrate' in navigator)
+   }, [])
+
+   const triggerHapticFeedback = () => {
+      if (hapticEnabled) {
+         // Short, subtle vibration (15ms)
+         navigator.vibrate?.(15)
+      }
+   }
+
    const toggleMenu = () => {
+      triggerHapticFeedback()
       setIsOpen(!isOpen)
       document.body.style.overflow = !isOpen ? 'hidden' : 'auto'
    }
 
    const closeMenu = () => {
       if (isOpen) {
+         triggerHapticFeedback()
          setIsOpen(false)
          document.body.style.overflow = 'auto'
       }
@@ -46,6 +61,15 @@ const Sidebar = () => {
    }) => {
       const active = isActive(href)
       const [imageError, setImageError] = useState(false)
+      const [isPressed, setIsPressed] = useState(false)
+
+      const handlePress = () => {
+         setIsPressed(true)
+         triggerHapticFeedback()
+         
+         // Reset pressed state after animation completes
+         setTimeout(() => setIsPressed(false), 150)
+      }
 
       const renderContent = () => {
          if (!isProfile) {
@@ -77,7 +101,16 @@ const Sidebar = () => {
       }
 
       return (
-         <Link href={href} onClick={closeMenu} className={`group relative flex items-center justify-center p-2 rounded-full transition-colors ${active ? 'bg-[var(--color-surface-hover)]' : 'hover:bg-[var(--color-surface-hover)]'}`} aria-label={label}>
+         <Link 
+            href={href} 
+            onClick={(e) => {
+               handlePress()
+               closeMenu()
+            }}
+            onTouchStart={handlePress}
+            className={`group relative flex items-center justify-center p-2 rounded-full transition-all duration-150 ${isPressed ? 'scale-90' : 'scale-100'} ${active ? 'bg-[var(--color-surface-hover)]' : 'hover:bg-[var(--color-surface-hover)]'}`} 
+            aria-label={label}
+         >
             {renderContent()}
             <span className="sr-only md:not-sr-only md:absolute md:left-full md:ml-2 md:whitespace-nowrap md:opacity-0 md:pointer-events-none md:bg-[var(--color-surface)] md:px-2 md:py-1 md:rounded md:text-sm md:shadow-lg md:group-hover:opacity-100 md:transition-opacity">{label}</span>
          </Link>
@@ -153,4 +186,4 @@ const Sidebar = () => {
    )
 }
 
-export default Sidebar 
+export default Sidebar

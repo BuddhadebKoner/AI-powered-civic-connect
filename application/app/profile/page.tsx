@@ -9,12 +9,12 @@ const PostsPage = () => {
   if (!user) return null;
 
   return (
-    <div className="bg-secondary rounded-lg shadow-lg">
+    <div className="bg-secondary rounded-lg min-h-screen p-4">
       <h2 className="text-xl font-semibold text-white mb-4">My Posts</h2>
       <p className="text-gray-300">
         Your posts will appear here. You currently have {user.postsCount} posts.
       </p>
-      {/* Posts will be fetched and displayed later */}
+      {/* Posts will be fetched and displayed later */} 
     </div>
   )
 }

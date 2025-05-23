@@ -2,14 +2,52 @@
 
 import { useUserAuthentication } from '@/context/AuthProvider'
 import { useRouter } from 'next/navigation'
-import React, { useEffect } from 'react'
-import { ArrowLeft, MoreVertical } from 'lucide-react'
+import React, { useEffect, useState, useRef } from 'react'
+import { ArrowLeft, MoreVertical, LogOut, Edit3, Settings } from 'lucide-react'
 import ProfileNavLink from '@/components/ui/ProfileNavLink'
 import ProfileInfo from '@/components/ui/ProfileInfo'
+import EditProfile from '@/components/popups/EditProfile'
+import { useClerk } from '@clerk/clerk-react'
 
 export default function ProfileLayout({ children }: { children: React.ReactNode }) {
-   const { user, isAuthenticated, isLoading, error } = useUserAuthentication();
+   const { user, isAuthenticated, isLoading, error } = useUserAuthentication();  
    const router = useRouter();
+   const { signOut } = useClerk();
+   const [dropdownOpen, setDropdownOpen] = useState(false);
+   const [editProfileOpen, setEditProfileOpen] = useState(false);
+   const [isUpdating, setIsUpdating] = useState(false);
+   const dropdownRef = useRef<HTMLDivElement>(null);
+
+   // Handle sign out
+   const handleSignOut = async () => {
+      try {
+         setDropdownOpen(false);
+         await signOut();
+      } catch (error) {
+         console.error("Sign out failed:", error);
+         // Optionally show a toast notification here
+      }
+   };
+
+   // Handle edit profile
+   const handleEditProfile = () => {
+      setDropdownOpen(false);
+      setEditProfileOpen(true);
+   };
+
+   // Close dropdown when clicking outside
+   useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+         if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+            setDropdownOpen(false);
+         }
+      };
+
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+         document.removeEventListener('mousedown', handleClickOutside);
+      };
+   }, []);
 
    useEffect(() => {
       if (!isLoading && !isAuthenticated) {
@@ -37,58 +75,119 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
    if (!user) return null;
 
    return (
-      <div className="min-h-screen bg-black text-white max-w-3xl mx-auto">
-         {/* Header */}
-         <div className="flex items-center justify-between p-4 border-b border-gray-800">
-            <button
-               onClick={() => router.back()}
-               className="p-2 hover:bg-gray-900 rounded-full transition-colors"
-               aria-label="Go back"
-            >
-               <ArrowLeft size={20} />
-            </button>
-            <h1 className="text-lg font-semibold">Profile</h1>
-            <button
-               className="p-2 hover:bg-gray-900 rounded-full transition-colors"
-               aria-label="More options"
-            >
-               <MoreVertical size={20} />
-            </button>
+      <div className="min-h-screen bg-black text-white max-w-3xl mx-auto flex flex-col">
+         {/* Fixed Header */}
+         <div className="sticky top-0 bg-black/90 backdrop-blur-md z-30 px-4 py-4 border-b border-gray-800/50">
+            <div className="flex items-center justify-between">
+               <button
+                  onClick={() => router.back()}
+                  className="p-2 hover:bg-gray-900 rounded-full transition-colors group"
+                  aria-label="Go back"
+               >
+                  <ArrowLeft size={20} className="group-hover:text-blue-400 transition-colors" />
+               </button>
+               <h1 className="text-lg font-semibold">Profile</h1>
+               <div className="relative cursor-pointer" ref={dropdownRef}>
+                  <button
+                     onClick={() => setDropdownOpen(!dropdownOpen)}
+                     className="p-2 hover:bg-gray-900 rounded-full transition-colors cursor-pointer group"
+                     aria-label="More options"
+                  >
+                     <MoreVertical size={20} className="group-hover:text-blue-400 transition-colors" />
+                  </button>
+
+                  {/* Enhanced Dropdown Menu */}
+                  {dropdownOpen && (
+                     <div className="absolute right-0 mt-2 w-56 bg-[#1a1a1a] backdrop-blur-md rounded-xl shadow-2xl z-10 py-2 border border-gray-700/50 animate-fadeIn">
+                        <button
+                           onClick={handleEditProfile}
+                           className="flex items-center w-full px-4 py-3 text-left transition-all duration-200 hover:bg-gray-800/70 group"
+                        >
+                           <div className="p-1.5 mr-3 bg-blue-600/20 rounded-full border border-blue-500/30 flex items-center justify-center">
+                              <Edit3 size={16} className="text-blue-400" />
+                           </div>
+                           <span className="text-white font-medium group-hover:text-blue-400 transition-colors">
+                              Edit Profile
+                           </span>
+                        </button>
+                        
+                        <div className="h-px bg-gray-700/50 my-1 mx-2"></div>
+                        
+                        <button
+                           onClick={handleSignOut}
+                           className="flex items-center w-full px-4 py-3 text-left transition-all duration-200 hover:bg-red-900/30 group"
+                        >
+                           <div className="p-1.5 mr-3 bg-red-600/20 rounded-full border border-red-500/30 flex items-center justify-center">
+                              <LogOut size={16} className="text-red-400" />
+                           </div>
+                           <span className="text-white font-medium group-hover:text-red-400 transition-colors">
+                              Sign Out
+                           </span>
+                        </button>
+                     </div>
+                  )}
+               </div>
+            </div>
          </div>
 
-         {/* Profile Section */}
-         <ProfileInfo
-            user={user}
-            onEditProfile={() => {
-               console.log('Edit profile clicked');
-            }}
-         />
-
-         {
-            user.role === 'masteradmin' ? (
-               <>
-                  <h1>
-                     Master Admin Profile
-                  </h1>
-               </>
-            ) : user.role === 'authority' ? (
-               <>
-                  <h1>
-                     Authority Profile
-                  </h1>
-               </>
-            ) : (
-               <>
-                  {/* Navigation Tabs */}
-                  <ProfileNavLink />
-
-                  {/* Content Section */}
-                  <div className="p-4">
-                     {children}
+         {/* Scrollable Content Area */}
+         <div className="flex-1 overflow-y-auto">
+            <div className='bg-[#181818] rounded-t-4xl shadow-lg min-h-[calc(100vh-80px)] relative'>
+               {/* Loading overlay when updating profile */}
+               {isUpdating && (
+                  <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-20 flex items-center justify-center rounded-t-4xl">
+                     <div className="bg-[#1a1a1a] rounded-xl p-6 border border-gray-700">
+                        <div className="flex items-center space-x-4">
+                           <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                           <span className="text-white font-medium">Updating profile...</span>
+                        </div>
+                     </div>
                   </div>
-               </>
-            )
-         }
-      </div >
+               )}
+
+               <div className="p-4">
+                  {/* Profile Section */}
+                  <ProfileInfo
+                     user={user}
+                     onEditProfile={handleEditProfile}
+                  />
+
+                  {user.role === 'masteradmin' ? (
+                     <div className="mt-6 p-6 bg-gradient-to-br from-purple-900/20 to-purple-600/20 rounded-xl border border-purple-500/30">
+                        <h1 className="text-2xl font-bold text-purple-400 mb-2">
+                           Master Admin Profile
+                        </h1>
+                        <p className="text-gray-300">Access to all system controls and settings.</p>
+                     </div>
+                  ) : user.role === 'authority' ? (
+                     <div className="mt-6 p-6 bg-gradient-to-br from-orange-900/20 to-orange-600/20 rounded-xl border border-orange-500/30">
+                        <h1 className="text-2xl font-bold text-orange-400 mb-2">
+                           Authority Profile
+                        </h1>
+                        <p className="text-gray-300">Manage civic issues and community oversight.</p>
+                     </div>
+                  ) : (
+                     <>
+                        {/* Navigation Tabs */}
+                        <div className="mt-6">
+                           <ProfileNavLink />
+                        </div>
+
+                        {/* Content Section */}
+                        <div className="mt-4">
+                           {children}
+                        </div>
+                     </>
+                  )}
+               </div>
+            </div>
+         </div>
+
+         {/* Edit Profile Modal */}
+         <EditProfile
+            isOpen={editProfileOpen}
+            onClose={() => setEditProfileOpen(false)}
+         />
+      </div>
    );
 }

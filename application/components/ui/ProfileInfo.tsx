@@ -1,7 +1,8 @@
-import React, { memo } from 'react';
+import React, { memo, useRef } from 'react';
 import Image from 'next/image';
 import { Lock, User, Shield, Building } from 'lucide-react'; // Added role icons
 import { UserTypeContext } from '@/types';
+import gsap from 'gsap';
 
 interface ProfileInfoProps {
    user: UserTypeContext;
@@ -9,11 +10,46 @@ interface ProfileInfoProps {
 }
 
 const ProfileInfo: React.FC<ProfileInfoProps> = ({ user, onEditProfile }) => {
+   const buttonRef = useRef<HTMLButtonElement>(null);
+
    // Get initials for avatar fallback
    const getInitials = (): string => {
       if (user.fullName && user.fullName.length > 0) return user.fullName.charAt(0);
       if (user.username && user.username.length > 0) return user.username.charAt(0);
       return '?';
+   };
+
+   const triggerHapticFeedback = () => {
+      if (!buttonRef.current) return;
+
+      // Create haptic feedback animation
+      const tl = gsap.timeline();
+      tl.to(buttonRef.current, {
+         scale: 0.95,
+         duration: 0.05
+      }).to(buttonRef.current, {
+         scale: 1.02,
+         duration: 0.05
+      }).to(buttonRef.current, {
+         scale: 1,
+         duration: 0.1
+      });
+
+      // Add subtle vibration/shake effect
+      gsap.to(buttonRef.current, {
+         x: "2px",
+         duration: 0.03,
+         repeat: 2,
+         yoyo: true,
+         clearProps: "x"
+      });
+   };
+
+   const handleEditClick = () => {
+      triggerHapticFeedback();
+      if (onEditProfile) {
+         onEditProfile();
+      }
    };
 
    const RoleBadge = () => {
@@ -98,8 +134,9 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({ user, onEditProfile }) => {
 
          {/* Edit Profile Button */}
          <button
-            onClick={onEditProfile}
-            className="w-full py-2 border border-gray-600 rounded-lg text-white font-medium hover:bg-gray-900 transition-colors mb-6"
+            ref={buttonRef}
+            onClick={handleEditClick}
+            className="w-full py-2 border border-gray-600 rounded-lg text-white font-medium mb-6 cursor-pointer hover:bg-gray-800 transition-colors"
          >
             Edit profile
          </button>
