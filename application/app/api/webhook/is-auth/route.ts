@@ -91,18 +91,6 @@ export async function GET() {
                }
             }
          }
-
-         if (dbUser.email !== userData.email ||
-            dbUser.fullName !== userData.name ||
-            dbUser.profilePictureUrl !== userData.imageUrl ||
-            dbUser.role !== userData.role) {
-
-            dbUser.email = userData.email;
-            dbUser.fullName = userData.name;
-            dbUser.profilePictureUrl = userData.imageUrl;
-            dbUser.role = userData.role;
-            await dbUser.save();
-         }
       }
 
       return NextResponse.json(
@@ -118,6 +106,7 @@ export async function GET() {
                role: dbUser.role,
                location: dbUser.location,
                profilePictureUrl: dbUser.profilePictureUrl,
+               profilePictureId: dbUser.profilePictureId,
                authorityType: dbUser.authorityType,
                department: dbUser.department,
                jurisdiction: dbUser.jurisdiction,

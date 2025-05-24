@@ -1,6 +1,6 @@
 import React, { memo, useRef } from 'react';
 import Image from 'next/image';
-import { Lock, User, Shield, Building } from 'lucide-react'; // Added role icons
+import { Lock, User, Shield, Building } from 'lucide-react';
 import { UserTypeContext } from '@/types';
 import gsap from 'gsap';
 
@@ -12,7 +12,6 @@ interface ProfileInfoProps {
 const ProfileInfo: React.FC<ProfileInfoProps> = ({ user, onEditProfile }) => {
    const buttonRef = useRef<HTMLButtonElement>(null);
 
-   // Get initials for avatar fallback
    const getInitials = (): string => {
       if (user.fullName && user.fullName.length > 0) return user.fullName.charAt(0);
       if (user.username && user.username.length > 0) return user.username.charAt(0);
@@ -22,7 +21,6 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({ user, onEditProfile }) => {
    const triggerHapticFeedback = () => {
       if (!buttonRef.current) return;
 
-      // Create haptic feedback animation
       const tl = gsap.timeline();
       tl.to(buttonRef.current, {
          scale: 0.95,
@@ -35,7 +33,6 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({ user, onEditProfile }) => {
          duration: 0.1
       });
 
-      // Add subtle vibration/shake effect
       gsap.to(buttonRef.current, {
          x: "2px",
          duration: 0.03,
@@ -144,5 +141,4 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({ user, onEditProfile }) => {
    );
 };
 
-// Use memo to prevent unnecessary re-renders
 export default memo(ProfileInfo);

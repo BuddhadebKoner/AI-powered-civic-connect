@@ -103,7 +103,7 @@ const Sidebar = () => {
       return (
          <Link 
             href={href} 
-            onClick={(e) => {
+            onClick={() => {
                handlePress()
                closeMenu()
             }}

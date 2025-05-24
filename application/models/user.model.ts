@@ -9,6 +9,7 @@ export interface iUser {
    isPrivateProfile: boolean;
    location: string;
    profilePictureUrl: string;
+   profilePictureId: string;
    role: string;
    authorityType: mongoose.Types.ObjectId;
    department: mongoose.Types.ObjectId;
@@ -51,6 +52,10 @@ const userSchema = new mongoose.Schema({
    },
    profilePictureUrl: {
       type: String,
+   },
+   profilePictureId: {
+      type: String,
+      default: "",
    },
    role: {
       type: String,

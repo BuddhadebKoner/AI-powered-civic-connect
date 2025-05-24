@@ -3,19 +3,18 @@
 import { useUserAuthentication } from '@/context/AuthProvider'
 import { useRouter } from 'next/navigation'
 import React, { useEffect, useState, useRef } from 'react'
-import { ArrowLeft, MoreVertical, LogOut, Edit3, Settings } from 'lucide-react'
+import { ArrowLeft, MoreVertical, LogOut, Edit3 } from 'lucide-react'
 import ProfileNavLink from '@/components/ui/ProfileNavLink'
 import ProfileInfo from '@/components/ui/ProfileInfo'
 import EditProfile from '@/components/popups/EditProfile'
 import { useClerk } from '@clerk/clerk-react'
 
 export default function ProfileLayout({ children }: { children: React.ReactNode }) {
-   const { user, isAuthenticated, isLoading, error } = useUserAuthentication();  
+   const { user, isAuthenticated, isLoading, error } = useUserAuthentication();
    const router = useRouter();
    const { signOut } = useClerk();
    const [dropdownOpen, setDropdownOpen] = useState(false);
    const [editProfileOpen, setEditProfileOpen] = useState(false);
-   const [isUpdating, setIsUpdating] = useState(false);
    const dropdownRef = useRef<HTMLDivElement>(null);
 
    // Handle sign out
@@ -55,14 +54,14 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
       }
    }, [isLoading, isAuthenticated, router]);
 
-   if (isLoading) {
-      return (
-         <div className="flex flex-col items-center justify-center min-h-screen bg-black">
-            <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-            <p className="mt-4 text-xl font-semibold text-white">Loading profile...</p>
-         </div>
-      );
-   }
+   // if (isLoading) {
+   //    return (
+   //       <div className="flex flex-col items-center justify-center min-h-screen bg-black">
+   //          <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+   //          <p className="mt-4 text-xl font-semibold text-white">Loading profile...</p>
+   //       </div>
+   //    );
+   // }
 
    if (error) {
       return (
@@ -75,7 +74,7 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
    if (!user) return null;
 
    return (
-      <div className="min-h-screen bg-black text-white max-w-3xl mx-auto flex flex-col">
+      <div className="min-h-screen bg-black text-white max-w-3xl mx-auto flex flex-col p-4">
          {/* Fixed Header */}
          <div className="sticky top-0 bg-black/90 backdrop-blur-md z-30 px-4 py-4 border-b border-gray-800/50">
             <div className="flex items-center justify-between">
@@ -110,9 +109,9 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
                               Edit Profile
                            </span>
                         </button>
-                        
+
                         <div className="h-px bg-gray-700/50 my-1 mx-2"></div>
-                        
+
                         <button
                            onClick={handleSignOut}
                            className="flex items-center w-full px-4 py-3 text-left transition-all duration-200 hover:bg-red-900/30 group"
@@ -133,17 +132,6 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
          {/* Scrollable Content Area */}
          <div className="flex-1 overflow-y-auto">
             <div className='bg-[#181818] rounded-t-4xl shadow-lg min-h-[calc(100vh-80px)] relative'>
-               {/* Loading overlay when updating profile */}
-               {isUpdating && (
-                  <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-20 flex items-center justify-center rounded-t-4xl">
-                     <div className="bg-[#1a1a1a] rounded-xl p-6 border border-gray-700">
-                        <div className="flex items-center space-x-4">
-                           <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                           <span className="text-white font-medium">Updating profile...</span>
-                        </div>
-                     </div>
-                  </div>
-               )}
 
                <div className="p-4">
                   {/* Profile Section */}

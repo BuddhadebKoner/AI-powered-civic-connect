@@ -6,6 +6,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import Sidebar from '@/components/shared/Sidebar'
 import { AuthProvider } from '@/context/AuthProvider'
+import { ImageKitProvider } from '@/context/ImageKitProvider'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -30,14 +31,16 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <AuthProvider>
-        <html lang="en">
-          <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-            <div className="flex">
-              <Sidebar />
-              <main className="flex-1">{children}</main>
-            </div>
-          </body>
-        </html>
+        <ImageKitProvider>
+          <html lang="en">
+            <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+              <div className="flex">
+                <Sidebar />
+                <main className="flex-1">{children}</main>
+              </div>
+            </body>
+          </html>
+        </ImageKitProvider>
       </AuthProvider>
     </ClerkProvider>
   )

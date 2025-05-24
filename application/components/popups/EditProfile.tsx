@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useState, useRef, useMemo, useEffect } from 'react'
-import { X, Camera, User, AtSign, FileText, Lock, Unlock, Check } from 'lucide-react'
-import { UserTypeContext } from '@/types';
+import React, { useState, useMemo, useEffect } from 'react'
+import { X, Lock, Unlock, Check } from 'lucide-react'
 import { useUserAuthentication } from '@/context/AuthProvider'
+import ImageUpload from '@/components/ImageUpload'
 
 interface EditProfileProps {
   isOpen: boolean;
@@ -11,24 +11,22 @@ interface EditProfileProps {
 }
 
 const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
-  const { user, isLoading: userLoading } = useUserAuthentication();
-  
-  // Store original values for comparison
-  const originalData = useMemo(() => ({ 
+  const { user, isLoading: userLoading, refreshAuth } = useUserAuthentication();
+
+  const originalData = useMemo(() => ({
     fullName: user?.fullName || '',
     username: user?.username || '',
     bio: user?.bio || '',
     isPrivateProfile: user?.isPrivateProfile || false,
-    profilePictureUrl: user?.profilePictureUrl || ''
+    profilePictureUrl: user?.profilePictureUrl || '',
+    profilePictureId: ''
   }), [user]);
 
   const [formData, setFormData] = useState(originalData);
-  const [previewImage, setPreviewImage] = useState<string>(user?.profilePictureUrl || '');
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [validationTimeouts, setValidationTimeouts] = useState<Record<string, NodeJS.Timeout>>({});
 
-  // Reset form when user data changes or modal opens
   useEffect(() => {
     if (isOpen && user) {
       const newData = {
@@ -36,34 +34,36 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
         username: user.username || '',
         bio: user.bio || '',
         isPrivateProfile: user.isPrivateProfile || false,
-        profilePictureUrl: user.profilePictureUrl || ''
+        profilePictureUrl: user.profilePictureUrl || '',
+        profilePictureId: ''
       };
       setFormData(newData);
-      setPreviewImage(user.profilePictureUrl || '');
       setErrors({});
     }
   }, [isOpen, user]);
 
-  // Check if any changes were made
   const hasChanges = useMemo(() => {
     return (
       formData.fullName !== originalData.fullName ||
       formData.username !== originalData.username ||
       formData.bio !== originalData.bio ||
       formData.isPrivateProfile !== originalData.isPrivateProfile ||
-      formData.profilePictureUrl !== originalData.profilePictureUrl
+      formData.profilePictureUrl !== originalData.profilePictureUrl ||
+      formData.profilePictureId !== originalData.profilePictureId
     );
   }, [formData, originalData]);
 
   const validateField = (name: string, value: string) => {
     const newErrors = { ...errors };
-    
+
     switch (name) {
       case 'fullName':
         if (!value.trim()) {
           newErrors.fullName = 'Name is required';
         } else if (value.length < 2) {
           newErrors.fullName = 'Name must be at least 2 characters';
+        } else if (value.length > 50) {
+          newErrors.fullName = 'Name must be less than 50 characters';
         } else {
           delete newErrors.fullName;
         }
@@ -73,37 +73,36 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
           newErrors.username = 'Username is required';
         } else if (value.length < 3) {
           newErrors.username = 'Username must be at least 3 characters';
+        } else if (value.length > 30) {
+          newErrors.username = 'Username must be less than 30 characters';
         } else if (!/^[a-zA-Z0-9_]+$/.test(value)) {
           newErrors.username = 'Username can only contain letters, numbers, and underscores';
         } else {
           delete newErrors.username;
         }
         break;
-      default:
+      case 'bio':
+        if (value.length > 160) {
+          newErrors.bio = 'Bio must be less than 160 characters';
+        } else {
+          delete newErrors.bio;
+        }
         break;
     }
-    
+
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return Object.keys(newErrors).filter(key => key !== 'general').length === 0;
   };
 
-  // Optimized change handler with debouncing for validation
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    
+
     if (type === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked;
-      setFormData(prev => ({
-        ...prev,
-        [name]: checked
-      }));
+      setFormData(prev => ({ ...prev, [name]: checked }));
     } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
-      
-      // Clear existing errors immediately for better UX
+      setFormData(prev => ({ ...prev, [name]: value }));
+
       if (errors[name]) {
         setErrors(prev => {
           const newErrors = { ...prev };
@@ -111,103 +110,89 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
           return newErrors;
         });
       }
-      
-      // Validate only after user stops typing (debounced validation)
-      if (name === 'fullName' || name === 'username') {
-        const timeoutId = setTimeout(() => {
-          validateField(name, value);
-        }, 300);
-        
-        return () => clearTimeout(timeoutId);
+
+      if (validationTimeouts[name]) {
+        clearTimeout(validationTimeouts[name]);
       }
+
+      const newTimeout = setTimeout(() => validateField(name, value), 300);
+      setValidationTimeouts(prev => ({ ...prev, [name]: newTimeout }));
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Clear previous image errors
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors.image;
-        return newErrors;
-      });
+  const handleImageUploadSuccess = (imageUrl: string, imageId?: string) => {
+    setFormData(prev => ({
+      ...prev,
+      profilePictureUrl: imageUrl,
+      profilePictureId: imageId || ''
+    }));
 
-      if (!file.type.startsWith('image/')) {
-        setErrors(prev => ({ ...prev, image: 'Please select a valid image file' }));
-        return;
-      }
-      
-      if (file.size > 5 * 1024 * 1024) {
-        setErrors(prev => ({ ...prev, image: 'Image size should be less than 5MB' }));
-        return;
-      }
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.image;
+      return newErrors;
+    });
+  };
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        setPreviewImage(result);
-        setFormData(prev => ({
-          ...prev,
-          profilePictureUrl: result
-        }));
-      };
-      reader.readAsDataURL(file);
-    }
+  const handleImageUploadError = (error: unknown) => {
+    console.error('Image upload failed:', error);
+    setErrors(prev => ({ ...prev, image: 'Failed to upload image. Please try again.' }));
   };
 
   const handleReset = () => {
-    setFormData(originalData);
-    setPreviewImage(originalData.profilePictureUrl);
+    setFormData({ ...originalData, profilePictureId: '' });
     setErrors({});
   };
 
   const handleSave = async () => {
-    // Validate all fields before saving
     const isFullNameValid = validateField('fullName', formData.fullName);
     const isUsernameValid = validateField('username', formData.username);
-    
-    if (!isFullNameValid || !isUsernameValid) {
-      return;
-    }
+    const isBioValid = validateField('bio', formData.bio);
 
-    // Only send changed fields
-    const changedFields: Partial<UserTypeContext> = {};
-    
-    if (formData.fullName !== originalData.fullName) {
-      changedFields.fullName = formData.fullName;
-    }
-    
-    if (formData.username !== originalData.username) {
-      changedFields.username = formData.username;
-    }
-    
-    if (formData.bio !== originalData.bio) {
-      changedFields.bio = formData.bio;
-    }
-    
-    if (formData.isPrivateProfile !== originalData.isPrivateProfile) {
-      changedFields.isPrivateProfile = formData.isPrivateProfile;
-    }
-    
-    if (formData.profilePictureUrl !== originalData.profilePictureUrl) {
-      changedFields.profilePictureUrl = formData.profilePictureUrl;
-    }
+    if (!isFullNameValid || !isUsernameValid || !isBioValid) return;
 
     setIsLoading(true);
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.general;
+      delete newErrors.username;
+      return newErrors;
+    });
+
     try {
-      // Here you would make the API call to save the profile
-      console.log('Saving profile changes:', changedFields);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Show success message briefly
-      console.log('Profile updated successfully');
-      onClose();
-    } catch (error) {
-      console.error('Error saving profile:', error);
-      setErrors(prev => ({ ...prev, general: 'Failed to save changes. Please try again.' }));
+      const response = await fetch('/api/user/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          username: formData.username,
+          bio: formData.bio,
+          isPrivateProfile: formData.isPrivateProfile,
+          profilePictureUrl: formData.profilePictureUrl,
+          profilePictureId: formData.profilePictureId
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.field && data.message) {
+          setErrors(prev => ({ ...prev, [data.field]: data.message }));
+        } else {
+          setErrors(prev => ({ ...prev, general: data.message || 'Failed to update profile' }));
+        }
+        return;
+      }
+
+      if (data.authenticated && data.user) {
+        await refreshAuth();
+        setErrors(prev => ({ ...prev, general: '' }));
+        setTimeout(() => onClose(), 200);
+      } else {
+        throw new Error(data.message || 'Failed to update profile');
+      }
+    } catch {
+      setErrors(prev => ({ ...prev, general:'Failed to save changes. Please try again.' }));
     } finally {
       setIsLoading(false);
     }
@@ -216,7 +201,6 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
   const isFormValid = Object.keys(errors).length === 0;
   const canSave = hasChanges && isFormValid && !isLoading;
 
-  // Show loading state if user data is still loading
   if (!isOpen) return null;
 
   if (userLoading || !user) {
@@ -235,7 +219,6 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fadeIn">
       <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Edit Profile</h2>
@@ -243,52 +226,27 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
           </div>
           <button
             onClick={onClose}
-            className="p-2.5 hover:bg-white/50 dark:hover:bg-gray-700/50 rounded-xl transition-all duration-200 group"
+            className="p-2.5 hover:bg-white/50 dark:hover:bg-gray-700/50 rounded-xl transition-all duration-200 group cursor-pointer"
             aria-label="Close"
           >
             <X size={20} className="text-gray-500 group-hover:text-gray-700 dark:text-gray-400 dark:group-hover:text-gray-200" />
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-          {/* General Error */}
           {errors.general && (
             <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
               <p className="text-red-600 dark:text-red-400 text-sm font-medium">{errors.general}</p>
             </div>
           )}
 
-          {/* Profile Picture */}
           <div className="flex justify-center">
-            <div className="relative group">
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="w-24 h-24 rounded-2xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 border-3 border-white dark:border-gray-600 shadow-xl cursor-pointer hover:scale-105 transition-all duration-300 ring-4 ring-blue-100 dark:ring-blue-900/30"
-              >
-                {previewImage ? (
-                  <img 
-                    src={previewImage} 
-                    alt="Profile" 
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <User size={32} className="text-gray-400 dark:text-gray-500" />
-                  </div>
-                )}
-              </div>
-              <div className="absolute -bottom-2 -right-2 bg-blue-500 hover:bg-blue-600 rounded-xl p-2 border-3 border-white dark:border-gray-900 shadow-lg transition-all duration-200 group-hover:scale-110">
-                <Camera size={14} className="text-white" />
-              </div>
-            </div>
-            
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="hidden"
+            <ImageUpload
+              currentImage={formData.profilePictureUrl}
+              onUploadSuccess={handleImageUploadSuccess}
+              onUploadError={handleImageUploadError}
+              size="lg"
+              disabled={isLoading}
             />
           </div>
 
@@ -298,9 +256,7 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
             </div>
           )}
 
-          {/* Form Fields */}
           <div className="space-y-5">
-            {/* Full Name */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 Full Name
@@ -311,9 +267,8 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
                   name="fullName"
                   value={formData.fullName}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 focus:border-blue-500 transition-all duration-200 text-sm font-medium ${
-                    errors.fullName ? 'border-red-500 bg-red-50 dark:bg-red-900/10' : 'border-gray-200 dark:border-gray-600'
-                  }`}
+                  className={`w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 focus:border-blue-500 transition-all duration-200 text-sm font-medium ${errors.fullName ? 'border-red-500 bg-red-50 dark:bg-red-900/10' : 'border-gray-200 dark:border-gray-600'
+                    }`}
                   placeholder="Enter your full name"
                   maxLength={50}
                 />
@@ -329,7 +284,6 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
               )}
             </div>
 
-            {/* Username */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 Username
@@ -340,9 +294,8 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
                   name="username"
                   value={formData.username}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 focus:border-blue-500 transition-all duration-200 text-sm font-medium ${
-                    errors.username ? 'border-red-500 bg-red-50 dark:bg-red-900/10' : 'border-gray-200 dark:border-gray-600'
-                  }`}
+                  className={`w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 focus:border-blue-500 transition-all duration-200 text-sm font-medium ${errors.username ? 'border-red-500 bg-red-50 dark:bg-red-900/10' : 'border-gray-200 dark:border-gray-600'
+                    }`}
                   placeholder="@username"
                   maxLength={30}
                 />
@@ -358,7 +311,6 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
               )}
             </div>
 
-            {/* Bio */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 Bio
@@ -380,7 +332,6 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
               </div>
             </div>
 
-            {/* Privacy Toggle */}
             <div className="p-4 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900/20 rounded-xl border-2 border-gray-200 dark:border-gray-600">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
@@ -413,7 +364,6 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        {/* Footer */}
         <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex space-x-3">
           {hasChanges && (
             <button
@@ -434,11 +384,10 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
           <button
             onClick={handleSave}
             disabled={!canSave}
-            className={`flex-1 px-4 py-2.5 rounded-xl transition-all duration-200 font-semibold flex items-center justify-center text-sm ${
-              canSave
-                ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl hover:scale-105'
-                : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-            }`}
+            className={`flex-1 px-4 py-2.5 rounded-xl transition-all duration-200 font-semibold flex items-center justify-center text-sm ${canSave
+              ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl hover:scale-105'
+              : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+              }`}
           >
             {isLoading ? (
               <>

@@ -29,6 +29,7 @@ export interface UserTypeContext {
    role?: string;
    location?: string;
    profilePictureUrl?: string;
+   profilePictureId?: string;
    postsCount?: number;
    isPrivateProfile?: boolean;
    resolvedPostsCount?: number;
