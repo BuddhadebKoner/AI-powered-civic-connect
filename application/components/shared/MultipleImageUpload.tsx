@@ -39,7 +39,8 @@ interface UploadState {
     progress: number;
     error: string | null;
     success: boolean;
-    uploadedFile: ImageKitUploadResponse | null;
+    uploadCount: number;
+    totalFiles: number;
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({
@@ -60,7 +61,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
         progress: 0,
         error: null,
         success: false,
-        uploadedFile: null
+        uploadCount: 0,
+        totalFiles: 0
     });
 
     const resetState = useCallback(() => {
@@ -69,7 +71,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
             progress: 0,
             error: null,
             success: false,
-            uploadedFile: null
+            uploadCount: 0,
+            totalFiles: 0
         });
     }, []);
 
@@ -87,15 +90,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
         return null;
     }, [accept, maxSize]);
 
-    const handleUpload = useCallback(async (file: File) => {
+    const handleUpload = useCallback(async (file: File, fileIndex: number, totalFiles: number) => {
         try {
-            setUploadState(prev => ({
-                ...prev,
-                isUploading: true,
-                error: null,
-                success: false
-            }));
-
             // Create new AbortController for this upload
             abortControllerRef.current = new AbortController();
 
@@ -113,33 +109,40 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 publicKey,
                 folder: "/posts",
                 onProgress: (event) => {
-                    const progress = (event.loaded / event.total) * 100;
+                    const fileProgress = (event.loaded / event.total) * 100;
+                    const overallProgress = ((fileIndex * 100 + fileProgress) / totalFiles);
                     setUploadState(prev => ({
                         ...prev,
-                        progress
+                        progress: overallProgress
                     }));
                 },
                 abortSignal: abortControllerRef.current.signal,
             }) as ImageKitUploadResponse;
 
-            // Success
+            // Update upload count
             setUploadState(prev => ({
                 ...prev,
-                isUploading: false,
-                success: true,
-                uploadedFile: uploadResponse,
-                progress: 100
+                uploadCount: prev.uploadCount + 1
             }));
 
             onUploadSuccess?.(uploadResponse);
 
-            // Reset to allow more uploads in multiple mode
-            if (multiple) {
+            // Check if all files are uploaded
+            if (fileIndex === totalFiles - 1) {
+                setUploadState(prev => ({
+                    ...prev,
+                    isUploading: false,
+                    success: true,
+                    progress: 100
+                }));
+
+                // Reset success state after 2 seconds
                 setTimeout(() => {
                     setUploadState(prev => ({
                         ...prev,
                         success: false,
-                        uploadedFile: null
+                        uploadCount: 0,
+                        totalFiles: 0
                     }));
                 }, 2000);
             }
@@ -161,26 +164,43 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 ...prev,
                 isUploading: false,
                 error: errorMessage,
-                progress: 0
+                progress: 0,
+                uploadCount: 0,
+                totalFiles: 0
             }));
 
             onUploadError?.(error as Error);
         }
-    }, [getAuthParams, onUploadSuccess, onUploadError, multiple]);
+    }, [getAuthParams, onUploadSuccess, onUploadError]);
 
-    const handleFileSelect = useCallback((file: File) => {
+    const handleFilesSelect = useCallback(async (files: File[]) => {
         resetState();
 
-        const validationError = validateFile(file);
-        if (validationError) {
-            setUploadState(prev => ({
-                ...prev,
-                error: validationError
-            }));
-            return;
+        // Validate all files first
+        for (const file of files) {
+            const validationError = validateFile(file);
+            if (validationError) {
+                setUploadState(prev => ({
+                    ...prev,
+                    error: validationError
+                }));
+                return;
+            }
         }
 
-        handleUpload(file);
+        setUploadState(prev => ({
+            ...prev,
+            isUploading: true,
+            error: null,
+            success: false,
+            totalFiles: files.length,
+            uploadCount: 0
+        }));
+
+        // Upload files sequentially
+        for (let i = 0; i < files.length; i++) {
+            await handleUpload(files[i], i, files.length);
+        }
     }, [validateFile, resetState, handleUpload]);
 
     const handleCancel = useCallback(() => {
@@ -198,24 +218,15 @@ const FileUpload: React.FC<FileUploadProps> = ({
     const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
         
-        if (multiple) {
-            // Handle multiple files
-            files.forEach(file => {
-                handleFileSelect(file);
-            });
-        } else {
-            // Handle single file
-            const file = files[0];
-            if (file) {
-                handleFileSelect(file);
-            }
+        if (files.length > 0) {
+            handleFilesSelect(files);
         }
         
         // Reset input value to allow re-selecting the same file
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
-    }, [handleFileSelect, multiple]);
+    }, [handleFilesSelect]);
 
     const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -223,19 +234,10 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
         const files = Array.from(e.dataTransfer.files);
         
-        if (multiple) {
-            // Handle multiple files
-            files.forEach(file => {
-                handleFileSelect(file);
-            });
-        } else {
-            // Handle single file
-            const file = files[0];
-            if (file) {
-                handleFileSelect(file);
-            }
+        if (files.length > 0) {
+            handleFilesSelect(files);
         }
-    }, [disabled, uploadState.isUploading, handleFileSelect, multiple]);
+    }, [disabled, uploadState.isUploading, handleFilesSelect]);
 
     const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -249,7 +251,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 className={`
-                    relative border-2 border-dashed rounded-xl p-4 text-center transition-all duration-200 cursor-pointer
+                    relative border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200 cursor-pointer
                     ${uploadState.isUploading || disabled
                         ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
                         : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50 dark:border-gray-600 dark:hover:border-blue-500 dark:hover:bg-blue-900/10'
@@ -269,17 +271,20 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 />
 
                 {/* Upload Content */}
-                <div className="flex flex-col items-center space-y-2">
+                <div className="flex flex-col items-center space-y-3">
                     {uploadState.isUploading ? (
                         <>
-                            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                                <Upload size={16} className="text-blue-600 dark:text-blue-400" />
+                            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                                <Upload size={20} className="text-blue-600 dark:text-blue-400" />
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-xs font-medium text-gray-900 dark:text-white">
-                                    Uploading... {Math.round(uploadState.progress)}%
+                            <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                    Uploading {uploadState.uploadCount + 1} of {uploadState.totalFiles} images...
                                 </p>
-                                <div className="w-32 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <p className="text-xs text-gray-600 dark:text-gray-400">
+                                    {Math.round(uploadState.progress)}% complete
+                                </p>
+                                <div className="w-48 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                     <div
                                         className="h-full bg-blue-600 transition-all duration-300 ease-out"
                                         style={{ width: `${uploadState.progress}%` }}
@@ -289,20 +294,23 @@ const FileUpload: React.FC<FileUploadProps> = ({
                         </>
                     ) : uploadState.success ? (
                         <>
-                            <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                                <Check size={16} className="text-green-600 dark:text-green-400" />
+                            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                                <Check size={20} className="text-green-600 dark:text-green-400" />
                             </div>
-                            <p className="text-xs font-medium text-green-900 dark:text-green-400">
-                                Upload successful!
+                            <p className="text-sm font-medium text-green-900 dark:text-green-400">
+                                {uploadState.totalFiles > 1 
+                                    ? `${uploadState.totalFiles} images uploaded successfully!`
+                                    : 'Image uploaded successfully!'
+                                }
                             </p>
                         </>
                     ) : uploadState.error ? (
                         <>
-                            <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
-                                <AlertCircle size={16} className="text-red-600 dark:text-red-400" />
+                            <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                                <AlertCircle size={20} className="text-red-600 dark:text-red-400" />
                             </div>
                             <div className="space-y-1">
-                                <p className="text-xs font-medium text-red-900 dark:text-red-400">
+                                <p className="text-sm font-medium text-red-900 dark:text-red-400">
                                     Upload failed
                                 </p>
                                 <p className="text-xs text-red-600 dark:text-red-400">
@@ -312,16 +320,21 @@ const FileUpload: React.FC<FileUploadProps> = ({
                         </>
                     ) : (
                         <>
-                            <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                                <ImageIcon size={16} className="text-gray-600 dark:text-gray-400" />
+                            <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+                                <ImageIcon size={20} className="text-gray-600 dark:text-gray-400" />
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-xs font-medium text-gray-900 dark:text-white">
+                            <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">
                                     {multiple ? 'Click or drag images to upload' : 'Click or drag image to upload'}
                                 </p>
                                 <p className="text-xs text-gray-600 dark:text-gray-400">
-                                    {accept === "image/*" ? "PNG, JPG, GIF" : "Select file"} up to {maxSize}MB
+                                    {accept === "image/*" ? "PNG, JPG, GIF" : "Select file"} up to {maxSize}MB each
                                 </p>
+                                {multiple && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-500">
+                                        You can select multiple images at once
+                                    </p>
+                                )}
                             </div>
                         </>
                     )}
@@ -334,9 +347,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
                             e.stopPropagation();
                             handleCancel();
                         }}
-                        className="absolute top-1 right-1 p-1 bg-white dark:bg-gray-800 rounded-full shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                        className="absolute top-2 right-2 p-2 bg-white dark:bg-gray-800 rounded-full shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                     >
-                        <X size={12} className="text-gray-600 dark:text-gray-400" />
+                        <X size={16} className="text-gray-600 dark:text-gray-400" />
                     </button>
                 )}
             </div>

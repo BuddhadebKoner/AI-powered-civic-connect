@@ -1,22 +1,24 @@
 import React, { useCallback } from 'react';
 import Image from 'next/image';
-import FileUpload from '../shared/FileUpload';
+import FileUpload from '../shared/MultipleImageUpload';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
+import { LoaderCircle } from 'lucide-react';
 
 interface FormData {
    title: string;
    subtitle: string;
    images: ImageData[];
    tags: string[];
-   keywords: string[];
    location: {
-      latitude: number;
-      longitude: number;
-      address: string;
+      city: string;
+      locality: string;
+      state: string;
+      country: string;
+      postcode: string;
    };
    visibility: 'PUBLIC' | 'PRIVATE' | 'RESTRICTED';
 }
@@ -47,25 +49,61 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
       subtitle: '',
       images: [] as ImageData[],
       tags: [] as string[],
-      keywords: [] as string[],
       location: {
-         latitude: 0,
-         longitude: 0,
-         address: '',
+         city: '',
+         locality: '',
+         state: '',
+         country: '',
+         postcode: '',
       },
       visibility: 'PUBLIC' as 'PUBLIC' | 'PRIVATE' | 'RESTRICTED',
    });
 
    const [tagInput, setTagInput] = React.useState('');
-   const [keywordInput, setKeywordInput] = React.useState('');
    const [locationLoading, setLocationLoading] = React.useState(false);
+   const [tagGenerating, setTagGenerating] = React.useState(false);
+   const [locationCache, setLocationCache] = React.useState<{
+      coords: { lat: number; lng: number };
+      address: {
+         city?: string;
+         locality?: string;
+         principalSubdivision?: string;
+         countryName?: string;
+         postcode?: string;
+      };
+      timestamp: number;
+   } | null>(null);
 
-   // Auto-fetch location on component mount
-   React.useEffect(() => {
-      getCurrentLocation();
-   }, []);
+   // Memoized location fetcher
+   const fetchLocationData = useCallback(async (latitude: number, longitude: number) => {
+      // Check cache first (cache for 30 minutes)
+      const CACHE_DURATION = 30 * 60 * 1000;
+      if (locationCache &&
+         Math.abs(locationCache.coords.lat - latitude) < 0.001 &&
+         Math.abs(locationCache.coords.lng - longitude) < 0.001 &&
+         Date.now() - locationCache.timestamp < CACHE_DURATION) {
+         return locationCache.address;
+      }
 
-   const getCurrentLocation = () => {
+      try {
+         const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+         const data = await response.json();
+
+         // Cache the result
+         setLocationCache({
+            coords: { lat: latitude, lng: longitude },
+            address: data,
+            timestamp: Date.now()
+         });
+
+         return data;
+      } catch (error) {
+         console.error('Error getting address:', error);
+         throw error;
+      }
+   }, [locationCache]);
+
+   const getCurrentLocation = useCallback(() => {
       setLocationLoading(true);
       if (navigator.geolocation) {
          navigator.geolocation.getCurrentPosition(
@@ -73,29 +111,20 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
                const { latitude, longitude } = position.coords;
 
                try {
-                  // Reverse geocoding to get address
-                  const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
-                  const data = await response.json();
-                  const address = data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-                  
+                  const data = await fetchLocationData(latitude, longitude);
+
                   setFormData(prev => ({
                      ...prev,
                      location: {
-                        latitude,
-                        longitude,
-                        address
+                        city: data.city || data.locality || '',
+                        locality: data.locality || data.principalSubdivision || '',
+                        state: data.principalSubdivision || '',
+                        country: data.countryName || '',
+                        postcode: data.postcode || '',
                      }
                   }));
                } catch (error) {
                   console.error('Error getting address:', error);
-                  setFormData(prev => ({
-                     ...prev,
-                     location: {
-                        latitude,
-                        longitude,
-                        address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-                     }
-                  }));
                }
                setLocationLoading(false);
             },
@@ -108,9 +137,14 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
          console.error('Geolocation is not supported by this browser.');
          setLocationLoading(false);
       }
-   };
+   }, [fetchLocationData]);
 
-   const handleLocationChange = (field: 'latitude' | 'longitude' | 'address', value: string | number) => {
+   // Auto-fetch location on component mount
+   React.useEffect(() => {
+      getCurrentLocation();
+   }, [getCurrentLocation]);
+
+   const handleLocationChange = (field: keyof FormData['location'], value: string) => {
       setFormData(prev => ({
          ...prev,
          location: {
@@ -128,43 +162,18 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
       }));
    };
 
-   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter' && tagInput.trim()) {
-         e.preventDefault();
-         if (!formData.tags.includes(tagInput.trim())) {
-            setFormData(prev => ({
-               ...prev,
-               tags: [...prev.tags, tagInput.trim()]
-            }));
-         }
-         setTagInput('');
-      }
-   };
+   const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
 
-   const handleAddKeyword = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter' && keywordInput.trim()) {
-         e.preventDefault();
-         if (!formData.keywords.includes(keywordInput.trim())) {
-            setFormData(prev => ({
-               ...prev,
-               keywords: [...prev.keywords, keywordInput.trim()]
-            }));
-         }
-         setKeywordInput('');
-      }
-   };
+      // remove unnessary whitespace and commas
+      const cleanedValue = value.replace(/\s*,\s*/g, ',').replace(/,+/g, ',').trim();
+      setTagInput(cleanedValue);
 
-   const removeTag = (tagToRemove: string) => {
+      // Convert comma-separated string to array
+      const tagsArray = value.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
       setFormData(prev => ({
          ...prev,
-         tags: prev.tags.filter(tag => tag !== tagToRemove)
-      }));
-   };
-
-   const removeKeyword = (keywordToRemove: string) => {
-      setFormData(prev => ({
-         ...prev,
-         keywords: prev.keywords.filter(keyword => keyword !== keywordToRemove)
+         tags: tagsArray
       }));
    };
 
@@ -174,14 +183,55 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
          url: response.url,
          id: response.fileId
       };
-      
+
       setFormData(prev => ({
          ...prev,
          images: [...prev.images, newImage]
       }));
-      
+
       onUploadSuccess(response);
    };
+
+   const generateTags = useCallback(async () => {
+      if (!formData.title && !formData.subtitle) {
+         alert('Please enter a title or description first to generate relevant tags.');
+         return;
+      }
+
+      setTagGenerating(true);
+      try {
+         const response = await fetch('/api/agent/get-tags', {
+            method: 'POST',
+            headers: {
+               'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+               title: formData.title,
+               description: formData.subtitle,
+            }),
+         });
+
+         if (!response.ok) {
+            throw new Error('Failed to generate tags');
+         }
+
+         const data = await response.json();
+         const generatedTags = data.tags || [];
+
+         // Update both the tags in formData and the tagInput display
+         setFormData(prev => ({
+            ...prev,
+            tags: generatedTags
+         }));
+         setTagInput(generatedTags.join(', '));
+
+      } catch (error) {
+         console.error('Error generating tags:', error);
+         alert('Failed to generate tags. Please try again.');
+      } finally {
+         setTagGenerating(false);
+      }
+   }, [formData.title, formData.subtitle]);
 
    const deleteImage = useCallback(async (imageId: string) => {
       try {
@@ -204,7 +254,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
    const removeImage = useCallback(async (imageId: string) => {
       // Delete from ImageKit
       await deleteImage(imageId);
-      
+
       // Remove from local state
       setFormData(prev => ({
          ...prev,
@@ -214,7 +264,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
 
    const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      
+
       // Console log the form data as requested
       console.log('Form Data Submitted:', {
          ...formData,
@@ -232,7 +282,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
          urgencyScore: 5,
          votedUsers: []
       });
-      
+
       onSubmit(formData);
    };
 
@@ -273,63 +323,93 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
          {/* Location Section */}
          <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-               Location *
+               Location Enter the issue location *
             </label>
             <div className="space-y-3">
-               {/* Address Input */}
-               <div>
-                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                     Address
-                  </label>
-                  <input
-                     type="text"
-                     value={formData.location.address}
-                     onChange={(e) => handleLocationChange('address', e.target.value)}
-                     required
-                     placeholder={locationLoading ? "Fetching current location..." : "Enter the exact location of the issue..."}
-                     disabled={locationLoading}
-                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 focus:border-blue-500 transition-all duration-200 disabled:opacity-50"
-                  />
-               </div>
-               
-               {/* Coordinates */}
-               <div className="grid grid-cols-2 gap-3">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                        Latitude
+                        City *
                      </label>
                      <input
-                        type="number"
-                        step="any"
-                        value={formData.location.latitude || ''}
-                        onChange={(e) => handleLocationChange('latitude', parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Latitude"
+                        type="text"
+                        value={formData.location.city}
+                        onChange={(e) => handleLocationChange('city', e.target.value)}
+                        required
+                        placeholder={locationLoading ? "Fetching..." : "Enter city"}
+                        disabled={locationLoading}
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50"
                      />
                   </div>
                   <div>
                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                        Longitude
+                        Locality *
                      </label>
                      <input
-                        type="number"
-                        step="any"
-                        value={formData.location.longitude || ''}
-                        onChange={(e) => handleLocationChange('longitude', parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Longitude"
+                        type="text"
+                        value={formData.location.locality}
+                        onChange={(e) => handleLocationChange('locality', e.target.value)}
+                        required
+                        placeholder={locationLoading ? "Fetching..." : "Enter locality/area"}
+                        disabled={locationLoading}
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50"
                      />
                   </div>
                </div>
 
-               <button
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                     <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        State *
+                     </label>
+                     <input
+                        type="text"
+                        value={formData.location.state}
+                        onChange={(e) => handleLocationChange('state', e.target.value)}
+                        required
+                        placeholder={locationLoading ? "Fetching..." : "Enter state"}
+                        disabled={locationLoading}
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50"
+                     />
+                  </div>
+                  <div>
+                     <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        Country *
+                     </label>
+                     <input
+                        type="text"
+                        value={formData.location.country}
+                        onChange={(e) => handleLocationChange('country', e.target.value)}
+                        required
+                        placeholder={locationLoading ? "Fetching..." : "Enter country"}
+                        disabled={locationLoading}
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50"
+                     />
+                  </div>
+                  <div>
+                     <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        Postcode *
+                     </label>
+                     <input
+                        type="text"
+                        value={formData.location.postcode}
+                        onChange={(e) => handleLocationChange('postcode', e.target.value)}
+                        required
+                        placeholder={locationLoading ? "Fetching..." : "Enter postcode"}
+                        disabled={locationLoading}
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50"
+                     />
+                  </div>
+               </div>
+
+               {/* <button
                   type="button"
                   onClick={getCurrentLocation}
                   disabled={locationLoading}
                   className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
                >
-                  {locationLoading ? 'Fetching location...' : '📍 Refresh current location'}
-               </button>
+                  {locationLoading ? 'Fetching location...' : '📍 Auto-fill from current location'}
+               </button> */}
             </div>
          </div>
 
@@ -338,53 +418,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                Add Images (Optional)
             </label>
-            
-            {/* Display uploaded images with Swiper */}
-            {formData.images.length > 0 && (
-               <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                     Uploaded Images ({formData.images.length})
-                  </h4>
-                  <Swiper
-                     modules={[Navigation, Pagination]}
-                     spaceBetween={10}
-                     slidesPerView={1}
-                     navigation
-                     pagination={{ clickable: true }}
-                     breakpoints={{
-                        640: { slidesPerView: 2 },
-                        768: { slidesPerView: 3 },
-                        1024: { slidesPerView: 4 }
-                     }}
-                     className="uploaded-images-swiper"
-                  >
-                     {formData.images.map((image, index) => (
-                        <SwiperSlide key={image.id}>
-                           <div className="relative group">
-                              <Image
-                                 src={image.url}
-                                 alt={`Upload ${index + 1}`}
-                                 width={200}
-                                 height={128}
-                                 className="w-full h-32 object-cover rounded-lg border-2 border-gray-200 dark:border-gray-600"
-                              />
-                              <button
-                                 type="button"
-                                 onClick={() => removeImage(image.id)}
-                                 className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
-                              >
-                                 ×
-                              </button>
-                              <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-                                 {index + 1}/{formData.images.length}
-                              </div>
-                           </div>
-                        </SwiperSlide>
-                     ))}
-                  </Swiper>
-               </div>
-            )}
-            
+
             {/* File Upload Component */}
             <FileUpload
                onUploadSuccess={handleImageUploadSuccess}
@@ -393,77 +427,108 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
                maxSize={5}
                multiple={true}
             />
+
+            {/* Display uploaded images with Swiper */}
+            {formData.images.length > 0 && (
+               <div className="mt-4">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                     Uploaded Images ({formData.images.length})
+                  </h4>
+                  <div className="relative">
+                     <Swiper
+                        modules={[Navigation, Pagination]}
+                        spaceBetween={12}
+                        slidesPerView={1}
+                        navigation={{
+                           nextEl: '.swiper-button-next-custom',
+                           prevEl: '.swiper-button-prev-custom',
+                        }}
+                        pagination={{
+                           clickable: true,
+                           dynamicBullets: true
+                        }}
+                        breakpoints={{
+                           640: { slidesPerView: 2 },
+                           768: { slidesPerView: 3 },
+                           1024: { slidesPerView: 4 }
+                        }}
+                        className="uploaded-images-swiper !pb-10"
+                     >
+                        {formData.images.map((image, index) => (
+                           <SwiperSlide key={image.id}>
+                              <div className="relative group bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                                 <div className="aspect-square relative">
+                                    <Image
+                                       src={image.url}
+                                       alt={`Upload ${index + 1}`}
+                                       fill
+                                       className="object-cover"
+                                       sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                    />
+                                    {/* Remove button */}
+                                    <button
+                                       type="button"
+                                       onClick={() => removeImage(image.id)}
+                                       className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm transition-all duration-200 opacity-0 group-hover:opacity-100 shadow-lg"
+                                    >
+                                       ×
+                                    </button>
+                                    {/* Image number badge */}
+                                    <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-md">
+                                       {index + 1} of {formData.images.length}
+                                    </div>
+                                 </div>
+                              </div>
+                           </SwiperSlide>
+                        ))}
+                     </Swiper>
+
+                     {/* Custom navigation buttons */}
+                     {formData.images.length > 4 && (
+                        <>
+                           <button className="swiper-button-prev-custom absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white dark:bg-gray-800 shadow-lg rounded-full w-8 h-8 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                              ‹
+                           </button>
+                           <button className="swiper-button-next-custom absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white dark:bg-gray-800 shadow-lg rounded-full w-8 h-8 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                              ›
+                           </button>
+                        </>
+                     )}
+                  </div>
+               </div>
+            )}
          </div>
 
          {/* Tags */}
          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-               Tags (Optional)
-            </label>
+            <div className="flex items-center justify-between mb-2">
+               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Tags (Optional)
+               </label>
+               <button
+                  type="button"
+                  onClick={generateTags}
+                  disabled={tagGenerating || (!formData.title && !formData.subtitle)}
+                  className="px-3 py-1 text-xs bg-gradient-to-r from-purple-500 to-blue-500 text-white font-medium rounded-lg hover:from-purple-600 hover:to-blue-600 focus:outline-none focus:ring-2 focus:ring-purple-100 dark:focus:ring-purple-900/30 transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+               >
+                  {tagGenerating ? (
+                     <span className="flex items-center gap-1">
+                       <LoaderCircle className="animate-spin h-4 w-4" />
+                        Generating...
+                     </span>
+                  ) : (
+                     'Generate Tags'
+                  )}
+               </button>
+            </div>
             <div className="space-y-3">
                <input
                   type="text"
                   value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={handleAddTag}
+                  onChange={handleTagsChange}
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 focus:border-blue-500 transition-all duration-200"
-                  placeholder="Add tags to help categorize your issue (press Enter to add)..."
+                  placeholder="Add tags separated by commas (e.g. road repair, pothole, traffic)"
                />
-               {formData.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                     {formData.tags.map((tag, index) => (
-                        <span
-                           key={index}
-                           className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-sm rounded-full"
-                        >
-                           {tag}
-                           <button
-                              type="button"
-                              onClick={() => removeTag(tag)}
-                              className="text-blue-600 hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-100"
-                           >
-                              ×
-                           </button>
-                        </span>
-                     ))}
-                  </div>
-               )}
-            </div>
-         </div>
-
-         {/* Keywords */}
-         <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-               Keywords (Optional)
-            </label>
-            <div className="space-y-3">
-               <input
-                  type="text"
-                  value={keywordInput}
-                  onChange={(e) => setKeywordInput(e.target.value)}
-                  onKeyDown={handleAddKeyword}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 focus:border-blue-500 transition-all duration-200"
-                  placeholder="Add keywords for better searchability (press Enter to add)..."
-               />
-               {formData.keywords.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                     {formData.keywords.map((keyword, index) => (
-                        <span
-                           key={index}
-                           className="inline-flex items-center gap-2 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 text-sm rounded-full"
-                        >
-                           {keyword}
-                           <button
-                              type="button"
-                              onClick={() => removeKeyword(keyword)}
-                              className="text-green-600 hover:text-green-800 dark:text-green-300 dark:hover:text-green-100"
-                           >
-                              ×
-                           </button>
-                        </span>
-                     ))}
-                  </div>
-               )}
             </div>
          </div>
 
@@ -488,7 +553,15 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
          <div className="flex justify-end pt-4">
             <button
                type="submit"
-               disabled={!formData.title || !formData.subtitle || !formData.location.address}
+               disabled={
+                  !formData.title ||
+                  !formData.subtitle ||
+                  !formData.location.city ||
+                  !formData.location.locality ||
+                  !formData.location.state ||
+                  !formData.location.country ||
+                  !formData.location.postcode
+               }
                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
                🚀 Submit Issue

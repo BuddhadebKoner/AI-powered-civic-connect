@@ -11,14 +11,17 @@ export interface iPost {
    tags: string[];
    keywords: string[];
    location: {
-      latitude: number;
-      longitude: number;
-      address: string;
+      city: string;
+      locality: string;
+      state: string;
+      country: string;
+      postcode: string;
    };
    category: mongoose.Types.ObjectId;
    department: mongoose.Types.ObjectId;
    status: "PENDING" | "REVIEWING" | "IN_PROGRESS" | "RESOLVED" | "REJECTED";
    visibility: "PUBLIC" | "PRIVATE" | "RESTRICTED";
+   isEdited?: boolean;
    upvotes: number;
    downvotes: number;
    assignedAuthorities: mongoose.Types.ObjectId[];
@@ -69,15 +72,23 @@ const postSchema = new mongoose.Schema({
       default: [],
    },
    location: {
-      latitude: {
-         type: Number,
+      city: {
+         type: String,
          required: true,
       },
-      longitude: {
-         type: Number,
+      locality: {
+         type: String,
          required: true,
       },
-      address: {
+      state: {
+         type: String,
+         required: true,
+      },
+      country: {
+         type: String,
+         required: true,
+      },
+      postcode: {
          type: String,
          required: true,
       },
@@ -103,6 +114,10 @@ const postSchema = new mongoose.Schema({
       required: true,
       enum: ["PUBLIC", "PRIVATE", "RESTRICTED"],
       default: "PUBLIC",
+   },
+   isEdited: {
+      type: Boolean,
+      default: false,
    },
    upvotes: {
       type: Number,
