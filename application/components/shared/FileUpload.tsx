@@ -31,6 +31,7 @@ interface FileUploadProps {
     maxSize?: number; // in MB
     className?: string;
     disabled?: boolean;
+    multiple?: boolean;
 }
 
 interface UploadState {
@@ -47,7 +48,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
     accept = "image/*",
     maxSize = 5,
     className = "",
-    disabled = false
+    disabled = false,
+    multiple = false
 }) => {
     const { getAuthParams } = useImageKit();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -90,7 +92,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
             setUploadState(prev => ({
                 ...prev,
                 isUploading: true,
-                error: null
+                error: null,
+                success: false
             }));
 
             // Create new AbortController for this upload
@@ -103,11 +106,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
             // Upload file
             const uploadResponse = await upload({
                 file,
-                fileName: `${Date.now()}-${file.name}`,
+                fileName: `post-${Date.now()}-${file.name}`,
                 expire: parseInt(expire),
                 token,
                 signature,
                 publicKey,
+                folder: "/posts",
                 onProgress: (event) => {
                     const progress = (event.loaded / event.total) * 100;
                     setUploadState(prev => ({
@@ -128,6 +132,17 @@ const FileUpload: React.FC<FileUploadProps> = ({
             }));
 
             onUploadSuccess?.(uploadResponse);
+
+            // Reset to allow more uploads in multiple mode
+            if (multiple) {
+                setTimeout(() => {
+                    setUploadState(prev => ({
+                        ...prev,
+                        success: false,
+                        uploadedFile: null
+                    }));
+                }, 2000);
+            }
 
         } catch (error) {
             let errorMessage = 'Upload failed. Please try again.';
@@ -151,7 +166,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
             onUploadError?.(error as Error);
         }
-    }, [getAuthParams, onUploadSuccess, onUploadError]);
+    }, [getAuthParams, onUploadSuccess, onUploadError, multiple]);
 
     const handleFileSelect = useCallback((file: File) => {
         resetState();
@@ -181,25 +196,46 @@ const FileUpload: React.FC<FileUploadProps> = ({
     }, [disabled, uploadState.isUploading]);
 
     const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            handleFileSelect(file);
+        const files = Array.from(e.target.files || []);
+        
+        if (multiple) {
+            // Handle multiple files
+            files.forEach(file => {
+                handleFileSelect(file);
+            });
+        } else {
+            // Handle single file
+            const file = files[0];
+            if (file) {
+                handleFileSelect(file);
+            }
         }
+        
         // Reset input value to allow re-selecting the same file
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
-    }, [handleFileSelect]);
+    }, [handleFileSelect, multiple]);
 
     const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         if (disabled || uploadState.isUploading) return;
 
-        const file = e.dataTransfer.files[0];
-        if (file) {
-            handleFileSelect(file);
+        const files = Array.from(e.dataTransfer.files);
+        
+        if (multiple) {
+            // Handle multiple files
+            files.forEach(file => {
+                handleFileSelect(file);
+            });
+        } else {
+            // Handle single file
+            const file = files[0];
+            if (file) {
+                handleFileSelect(file);
+            }
         }
-    }, [disabled, uploadState.isUploading, handleFileSelect]);
+    }, [disabled, uploadState.isUploading, handleFileSelect, multiple]);
 
     const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -213,7 +249,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 className={`
-                    relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer
+                    relative border-2 border-dashed rounded-xl p-4 text-center transition-all duration-200 cursor-pointer
                     ${uploadState.isUploading || disabled
                         ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
                         : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50 dark:border-gray-600 dark:hover:border-blue-500 dark:hover:bg-blue-900/10'
@@ -226,23 +262,24 @@ const FileUpload: React.FC<FileUploadProps> = ({
                     ref={fileInputRef}
                     type="file"
                     accept={accept}
+                    multiple={multiple}
                     onChange={handleFileChange}
                     className="hidden"
                     disabled={disabled || uploadState.isUploading}
                 />
 
                 {/* Upload Content */}
-                <div className="flex flex-col items-center space-y-4">
+                <div className="flex flex-col items-center space-y-2">
                     {uploadState.isUploading ? (
                         <>
-                            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                                <Upload size={24} className="text-blue-600 dark:text-blue-400" />
+                            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                                <Upload size={16} className="text-blue-600 dark:text-blue-400" />
                             </div>
-                            <div className="space-y-2">
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            <div className="space-y-1">
+                                <p className="text-xs font-medium text-gray-900 dark:text-white">
                                     Uploading... {Math.round(uploadState.progress)}%
                                 </p>
-                                <div className="w-48 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div className="w-32 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                     <div
                                         className="h-full bg-blue-600 transition-all duration-300 ease-out"
                                         style={{ width: `${uploadState.progress}%` }}
@@ -252,25 +289,20 @@ const FileUpload: React.FC<FileUploadProps> = ({
                         </>
                     ) : uploadState.success ? (
                         <>
-                            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                                <Check size={24} className="text-green-600 dark:text-green-400" />
+                            <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                                <Check size={16} className="text-green-600 dark:text-green-400" />
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-sm font-medium text-green-900 dark:text-green-400">
-                                    Upload successful!
-                                </p>
-                                <p className="text-xs text-gray-600 dark:text-gray-400">
-                                    File uploaded successfully
-                                </p>
-                            </div>
+                            <p className="text-xs font-medium text-green-900 dark:text-green-400">
+                                Upload successful!
+                            </p>
                         </>
                     ) : uploadState.error ? (
                         <>
-                            <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
-                                <AlertCircle size={24} className="text-red-600 dark:text-red-400" />
+                            <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                                <AlertCircle size={16} className="text-red-600 dark:text-red-400" />
                             </div>
                             <div className="space-y-1">
-                                <p className="text-sm font-medium text-red-900 dark:text-red-400">
+                                <p className="text-xs font-medium text-red-900 dark:text-red-400">
                                     Upload failed
                                 </p>
                                 <p className="text-xs text-red-600 dark:text-red-400">
@@ -280,12 +312,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
                         </>
                     ) : (
                         <>
-                            <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                                <ImageIcon size={24} className="text-gray-600 dark:text-gray-400" />
+                            <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+                                <ImageIcon size={16} className="text-gray-600 dark:text-gray-400" />
                             </div>
                             <div className="space-y-1">
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                    Click to upload or drag and drop
+                                <p className="text-xs font-medium text-gray-900 dark:text-white">
+                                    {multiple ? 'Click or drag images to upload' : 'Click or drag image to upload'}
                                 </p>
                                 <p className="text-xs text-gray-600 dark:text-gray-400">
                                     {accept === "image/*" ? "PNG, JPG, GIF" : "Select file"} up to {maxSize}MB
@@ -302,33 +334,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
                             e.stopPropagation();
                             handleCancel();
                         }}
-                        className="absolute top-2 right-2 p-1 bg-white dark:bg-gray-800 rounded-full shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                        className="absolute top-1 right-1 p-1 bg-white dark:bg-gray-800 rounded-full shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                     >
-                        <X size={16} className="text-gray-600 dark:text-gray-400" />
+                        <X size={12} className="text-gray-600 dark:text-gray-400" />
                     </button>
                 )}
             </div>
-
-            {/* Upload Info */}
-            {uploadState.uploadedFile && (
-                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                {uploadState.uploadedFile.name}
-                            </p>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">
-                                {(uploadState.uploadedFile.size / 1024 / 1024).toFixed(2)} MB
-                            </p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-xs text-gray-600 dark:text-gray-400">
-                                URL: {uploadState.uploadedFile.url}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

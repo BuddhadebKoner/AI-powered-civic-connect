@@ -11,9 +11,11 @@ import {
 import { Camera, Upload, X, User, Check, AlertCircle } from 'lucide-react';
 import { useImageKit } from '@/context/ImageKitProvider';
 import Image from "next/image";
+import CropModal from "../ui/CropModal";
 
 interface ImageUploadProps {
     currentImage?: string;
+    currentImageId?: string;
     onUploadSuccess?: (imageUrl: string, imageId?: string) => void;
     onUploadError?: (error: unknown) => void;
     className?: string;
@@ -29,6 +31,7 @@ interface UploadState {
 
 const ImageUpload: React.FC<ImageUploadProps> = ({
     currentImage,
+    currentImageId,
     onUploadSuccess,
     onUploadError,
     className = "",
@@ -46,6 +49,8 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     });
 
     const [previewImage, setPreviewImage] = useState<string>(currentImage || '');
+    const [showCropModal, setShowCropModal] = useState(false);
+    const [selectedFileForCrop, setSelectedFileForCrop] = useState<string>('');
 
     const sizeClasses = {
         sm: 'w-16 h-16',
@@ -81,6 +86,26 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
         return null;
     }, []);
 
+    const deleteImage = useCallback(async (imageId: string) => {
+        try {
+            const response = await fetch('/api/imagekit-delete', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ fileId: imageId })
+            });
+
+            if (!response.ok) {
+                console.warn('Failed to delete previous image:', response.statusText);
+                // Don't throw error here as we don't want to prevent the new upload
+            }
+        } catch (error) {
+            console.warn('Error deleting previous image:', error);
+            // Don't throw error here as we don't want to prevent the new upload
+        }
+    }, []);
+
     const handleUpload = useCallback(async (file: File) => {
         try {
             setUploadState(prev => ({
@@ -88,6 +113,11 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
                 isUploading: true,
                 error: null
             }));
+
+            // Delete previous image if it exists
+            if (currentImageId && currentImageId.trim()) {
+                await deleteImage(currentImageId);
+            }
 
             // Create new AbortController for this upload
             abortControllerRef.current = new AbortController();
@@ -150,7 +180,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
             setPreviewImage(currentImage || '');
             onUploadError?.(error);
         }
-    }, [getAuthParams, onUploadSuccess, onUploadError, currentImage]);
+    }, [getAuthParams, onUploadSuccess, onUploadError, currentImage, currentImageId, deleteImage]);
 
     const handleFileSelect = useCallback((file: File) => {
         resetState();
@@ -164,15 +194,36 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
             return;
         }
 
-        // Create preview
+        // Create preview URL for cropping
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const imageUrl = event.target?.result as string;
+            setSelectedFileForCrop(imageUrl);
+            setShowCropModal(true);
+        };
+        reader.readAsDataURL(file);
+    }, [validateFile, resetState]);
+
+    const handleCropComplete = useCallback((croppedFile: File) => {
+        setShowCropModal(false);
+        setSelectedFileForCrop('');
+
+        // Create preview for cropped image
         const reader = new FileReader();
         reader.onload = (event) => {
             setPreviewImage(event.target?.result as string);
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(croppedFile);
 
-        handleUpload(file);
-    }, [validateFile, resetState, handleUpload]);
+        // Upload the cropped file
+        handleUpload(croppedFile);
+    }, [handleUpload]);
+
+    const handleCropCancel = useCallback(() => {
+        setShowCropModal(false);
+        setSelectedFileForCrop('');
+        resetState();
+    }, [resetState]);
 
     const handleCancel = useCallback(() => {
         if (abortControllerRef.current) {
@@ -294,6 +345,14 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
                     </div>
                 </div>
             )}
+
+            {/* Crop Modal */}
+            <CropModal
+                isOpen={showCropModal}
+                imageSrc={selectedFileForCrop}
+                onCrop={handleCropComplete}
+                onCancel={handleCropCancel}
+            />
         </div>
     );
 };

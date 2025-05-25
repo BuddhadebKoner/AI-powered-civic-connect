@@ -13,7 +13,7 @@
   --color-gray-700: #262626;
   --color-gray-800: #171717;
   --color-gray-900: #0a0a0a;
-  
+
   /* Semantic colors - Light theme */
   --color-background: var(--color-white);
   --color-foreground: var(--color-gray-800);
@@ -28,7 +28,7 @@
   .text-icon-disabled {
     color: var(--color-icon-disabled);
   }
-  
+
   .hover\:bg-surface-hover:hover {
     background-color: var(--color-surface-hover);
   }
@@ -40,8 +40,13 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @theme inline {

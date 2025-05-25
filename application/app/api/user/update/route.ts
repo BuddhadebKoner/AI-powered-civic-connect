@@ -17,6 +17,8 @@ export async function PUT(request: NextRequest) {
       // Parse request body
       const { fullName, username, bio, isPrivateProfile, profilePictureUrl, profilePictureId } = await request.json();
 
+      console.log(profilePictureId);
+
       // Validate required fields
       if (!fullName?.trim() || !username?.trim()) {
          return NextResponse.json(

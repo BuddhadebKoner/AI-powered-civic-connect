@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { X, Lock, Unlock, Check } from 'lucide-react'
 import { useUserAuthentication } from '@/context/AuthProvider'
-import ImageUpload from '@/components/ImageUpload'
+import ImageUpload from '@/components/shared/ImageUpload'
 
 interface EditProfileProps {
   isOpen: boolean;
@@ -243,6 +243,7 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
           <div className="flex justify-center">
             <ImageUpload
               currentImage={formData.profilePictureUrl}
+              currentImageId={user?.profilePictureId}
               onUploadSuccess={handleImageUploadSuccess}
               onUploadError={handleImageUploadError}
               size="lg"
