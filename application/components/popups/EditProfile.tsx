@@ -42,6 +42,16 @@ const EditProfile: React.FC<EditProfileProps> = ({ isOpen, onClose }) => {
     }
   }, [isOpen, user]);
 
+  // Add body overflow control
+  useEffect(() => {
+    document.body.style.overflow = isOpen ? 'hidden' : 'auto';
+    
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [isOpen]);
+
   const hasChanges = useMemo(() => {
     return (
       formData.fullName !== originalData.fullName ||

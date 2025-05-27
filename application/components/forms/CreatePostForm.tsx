@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import Image from 'next/image';
 import FileUpload from '../shared/MultipleImageUpload';
-import { Swiper, SwiperSlide } from 'swiper/react';
+import { Swiper, SwiperSlide } from 'swiper/react';   
 import { Navigation, Pagination } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/navigation';
@@ -60,89 +60,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
    });
 
    const [tagInput, setTagInput] = React.useState('');
-   const [locationLoading, setLocationLoading] = React.useState(false);
    const [tagGenerating, setTagGenerating] = React.useState(false);
-   const [locationCache, setLocationCache] = React.useState<{
-      coords: { lat: number; lng: number };
-      address: {
-         city?: string;
-         locality?: string;
-         principalSubdivision?: string;
-         countryName?: string;
-         postcode?: string;
-      };
-      timestamp: number;
-   } | null>(null);
-
-   // Memoized location fetcher
-   const fetchLocationData = useCallback(async (latitude: number, longitude: number) => {
-      // Check cache first (cache for 30 minutes)
-      const CACHE_DURATION = 30 * 60 * 1000;
-      if (locationCache &&
-         Math.abs(locationCache.coords.lat - latitude) < 0.001 &&
-         Math.abs(locationCache.coords.lng - longitude) < 0.001 &&
-         Date.now() - locationCache.timestamp < CACHE_DURATION) {
-         return locationCache.address;
-      }
-
-      try {
-         const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
-         const data = await response.json();
-
-         // Cache the result
-         setLocationCache({
-            coords: { lat: latitude, lng: longitude },
-            address: data,
-            timestamp: Date.now()
-         });
-
-         return data;
-      } catch (error) {
-         console.error('Error getting address:', error);
-         throw error;
-      }
-   }, [locationCache]);
-
-   const getCurrentLocation = useCallback(() => {
-      setLocationLoading(true);
-      if (navigator.geolocation) {
-         navigator.geolocation.getCurrentPosition(
-            async (position) => {
-               const { latitude, longitude } = position.coords;
-
-               try {
-                  const data = await fetchLocationData(latitude, longitude);
-
-                  setFormData(prev => ({
-                     ...prev,
-                     location: {
-                        city: data.city || data.locality || '',
-                        locality: data.locality || data.principalSubdivision || '',
-                        state: data.principalSubdivision || '',
-                        country: data.countryName || '',
-                        postcode: data.postcode || '',
-                     }
-                  }));
-               } catch (error) {
-                  console.error('Error getting address:', error);
-               }
-               setLocationLoading(false);
-            },
-            (error) => {
-               console.error('Error getting location:', error);
-               setLocationLoading(false);
-            }
-         );
-      } else {
-         console.error('Geolocation is not supported by this browser.');
-         setLocationLoading(false);
-      }
-   }, [fetchLocationData]);
-
-   // Auto-fetch location on component mount
-   React.useEffect(() => {
-      getCurrentLocation();
-   }, [getCurrentLocation]);
 
    const handleLocationChange = (field: keyof FormData['location'], value: string) => {
       setFormData(prev => ({
@@ -320,10 +238,10 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
             />
          </div>
 
-         {/* Location Section */}
+         {/* Location Section - Updated */}
          <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-               Location Enter the issue location *
+               Issue Location *
             </label>
             <div className="space-y-3">
                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -336,9 +254,8 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
                         value={formData.location.city}
                         onChange={(e) => handleLocationChange('city', e.target.value)}
                         required
-                        placeholder={locationLoading ? "Fetching..." : "Enter city"}
-                        disabled={locationLoading}
-                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50"
+                        placeholder="Enter city"
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                      />
                   </div>
                   <div>
@@ -350,9 +267,8 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
                         value={formData.location.locality}
                         onChange={(e) => handleLocationChange('locality', e.target.value)}
                         required
-                        placeholder={locationLoading ? "Fetching..." : "Enter locality/area"}
-                        disabled={locationLoading}
-                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50"
+                        placeholder="Enter locality/area"
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                      />
                   </div>
                </div>
@@ -367,9 +283,8 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
                         value={formData.location.state}
                         onChange={(e) => handleLocationChange('state', e.target.value)}
                         required
-                        placeholder={locationLoading ? "Fetching..." : "Enter state"}
-                        disabled={locationLoading}
-                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50"
+                        placeholder="Enter state"
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                      />
                   </div>
                   <div>
@@ -381,9 +296,8 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
                         value={formData.location.country}
                         onChange={(e) => handleLocationChange('country', e.target.value)}
                         required
-                        placeholder={locationLoading ? "Fetching..." : "Enter country"}
-                        disabled={locationLoading}
-                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50"
+                        placeholder="Enter country"
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                      />
                   </div>
                   <div>
@@ -395,21 +309,11 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
                         value={formData.location.postcode}
                         onChange={(e) => handleLocationChange('postcode', e.target.value)}
                         required
-                        placeholder={locationLoading ? "Fetching..." : "Enter postcode"}
-                        disabled={locationLoading}
-                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50"
+                        placeholder="Enter postcode"
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                      />
                   </div>
                </div>
-
-               {/* <button
-                  type="button"
-                  onClick={getCurrentLocation}
-                  disabled={locationLoading}
-                  className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
-               >
-                  {locationLoading ? 'Fetching location...' : '📍 Auto-fill from current location'}
-               </button> */}
             </div>
          </div>
 

@@ -50,7 +50,7 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
 
    useEffect(() => {
       if (!isLoading && !isAuthenticated) {
-         router.push('/login');
+         router.push('/sign-in');
       }
    }, [isLoading, isAuthenticated, router]);
 

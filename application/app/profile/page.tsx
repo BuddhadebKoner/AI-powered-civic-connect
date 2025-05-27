@@ -5,7 +5,7 @@ import { useUserAuthentication } from '@/context/AuthProvider'
 
 const PostsPage = () => {
   const { user } = useUserAuthentication();
-  
+
   if (!user) return null;
 
   return (
@@ -14,7 +14,7 @@ const PostsPage = () => {
       <p className="text-gray-300">
         Your posts will appear here. You currently have {user.postsCount} posts.
       </p>
-      {/* Posts will be fetched and displayed later */} 
+      {/* Posts will be fetched and displayed later */}
     </div>
   )
 }
