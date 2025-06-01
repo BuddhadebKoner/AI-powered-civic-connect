@@ -64,7 +64,7 @@ const userSchema = new mongoose.Schema({
    },
    authorityType: {
       type: mongoose.Types.ObjectId,
-      ref: "AuthorityType",
+      ref: "Authority",
    },
    department: {
       type: mongoose.Types.ObjectId,

@@ -117,13 +117,28 @@ const Sidebar = () => {
       )
    }
 
+   const getProfileRoute = () => {
+      if (!isAuthenticated || !user) return '/sign-in';
+      
+      switch (user.role) {
+         case 'masteradmin':
+            return '/profile/masteradmin';
+         case 'authority':
+            return '/profile/authority';
+         case 'citizen':
+            return '/profile/posts';
+         default:
+            return '/profile';
+      }
+   };
+
    const navItems = [
       { href: '/', icon: Home, label: 'Home' },
       { href: '/search', icon: Search, label: 'Search' },
       { href: '/create', icon: PlusCircle, label: 'Create' },
       { href: '/notification', icon: Heart, label: 'Notifications' },
       {
-         href: isAuthenticated ? '/profile' : '/sign-in',
+         href: getProfileRoute(),
          icon: User,
          label: isAuthenticated ? 'Profile' : 'Sign In',
          isProfile: true

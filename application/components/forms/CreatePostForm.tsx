@@ -14,7 +14,8 @@ interface FormData {
    images: ImageData[];
    tags: string[];
    location: {
-      city: string;
+      type: 'city' | 'district' | 'state' | 'country' | 'policeStation' | 'village' | 'ward' | 'block' | 'locality';
+      name: string;
       locality: string;
       state: string;
       country: string;
@@ -50,7 +51,8 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
       images: [] as ImageData[],
       tags: [] as string[],
       location: {
-         city: '',
+         type: 'city' as const,
+         name: '',
          locality: '',
          state: '',
          country: '',
@@ -247,27 +249,35 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                        City *
+                        Location Type *
                      </label>
-                     <input
-                        type="text"
-                        value={formData.location.city}
-                        onChange={(e) => handleLocationChange('city', e.target.value)}
+                     <select
+                        value={formData.location.type}
+                        onChange={(e) => handleLocationChange('type', e.target.value)}
                         required
-                        placeholder="Enter city"
-                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                     />
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                     >
+                        <option value="city">City</option>
+                        <option value="district">District</option>
+                        <option value="state">State</option>
+                        <option value="country">Country</option>
+                        <option value="policeStation">Police Station</option>
+                        <option value="village">Village</option>
+                        <option value="ward">Ward</option>
+                        <option value="block">Block</option>
+                        <option value="locality">Locality</option>
+                     </select>
                   </div>
                   <div>
                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                        Locality *
+                        Location Name *
                      </label>
                      <input
                         type="text"
-                        value={formData.location.locality}
-                        onChange={(e) => handleLocationChange('locality', e.target.value)}
+                        value={formData.location.name}
+                        onChange={(e) => handleLocationChange('name', e.target.value)}
                         required
-                        placeholder="Enter locality/area"
+                        placeholder={`Enter ${formData.location.type} name`}
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                      />
                   </div>
@@ -300,6 +310,9 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                      />
                   </div>
+               </div>
+
+               <div className="grid grid-cols-1 gap-3">
                   <div>
                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                         Postcode *
@@ -460,7 +473,8 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
                disabled={
                   !formData.title ||
                   !formData.subtitle ||
-                  !formData.location.city ||
+                  !formData.location.type ||
+                  !formData.location.name ||
                   !formData.location.locality ||
                   !formData.location.state ||
                   !formData.location.country ||

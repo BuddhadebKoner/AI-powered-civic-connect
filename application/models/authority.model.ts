@@ -2,11 +2,8 @@ import mongoose from 'mongoose';
 
 export interface iAuthority {
    userId: mongoose.Types.ObjectId;
-   department: mongoose.Types.ObjectId;
    position: string;
    verificationStatus: "PENDING" | "VERIFIED" | "REJECTED";
-   verificationDocuments: string[];
-   jurisdiction: string;
    contactInfo: {
       email: string;
       phone: string;
@@ -20,7 +17,12 @@ export interface iAuthority {
       end: string;
       timezone: string;
    };
-   isActive: boolean;
+   pendingIssues: mongoose.Types.ObjectId[];
+   resolvedIssues: mongoose.Types.ObjectId[];
+   area: {
+      type: string;
+      name: string;
+   }
 }
 
 const authoritySchema = new mongoose.Schema({
@@ -28,12 +30,6 @@ const authoritySchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       required: true,
       ref: 'User',
-      unique: true,
-   },
-   department: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true,
-      ref: 'Department',
    },
    position: {
       type: String,
@@ -45,17 +41,6 @@ const authoritySchema = new mongoose.Schema({
       required: true,
       enum: ["PENDING", "VERIFIED", "REJECTED"],
       default: "PENDING",
-   },
-   verificationDocuments: [
-      {
-         type: String,
-         required: true,
-      },
-   ],
-   jurisdiction: {
-      type: String,
-      required: true,
-      trim: true,
    },
    contactInfo: {
       email: {
@@ -100,15 +85,44 @@ const authoritySchema = new mongoose.Schema({
          default: "Asia/Kolkata",
       },
    },
-   isActive: {
-      type: Boolean,
-      default: true,
-   },
+   pendingIssues: [
+      {
+         type: mongoose.Schema.Types.ObjectId,
+         ref: 'Post',
+         default: [],
+      },
+   ],
+   resolvedIssues: [
+      {
+         type: mongoose.Schema.Types.ObjectId,
+         ref: 'Post',
+         default: [],
+      },
+   ],
+   area: {
+      type: {
+         type: String,
+         enum: ['city', 'district', 'state', 'country', 'policeStation', 'village', 'ward', 'block', 'locality'],
+         required: true,
+      },
+      name: {
+         type: String,
+         required: true,
+      },
+      state: {
+         type: String,
+         required: true,
+      },
+      country: {
+         type: String,
+         required: true,
+      },
+      postalCode: {
+         type: String,
+         required: true,
+      }
+   }
 }, { timestamps: true });
-
-// Create compound index for efficient querying
-authoritySchema.index({ department: 1, verificationStatus: 1 });
-authoritySchema.index({ jurisdiction: 1, isActive: 1 });
 
 const Authority = mongoose.models.Authority || mongoose.model<iAuthority>("Authority", authoritySchema);
 export default Authority;

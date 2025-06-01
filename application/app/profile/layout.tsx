@@ -15,6 +15,7 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
    const { signOut } = useClerk();
    const [dropdownOpen, setDropdownOpen] = useState(false);
    const [editProfileOpen, setEditProfileOpen] = useState(false);
+   const [hasRedirected, setHasRedirected] = useState(false);
    const dropdownRef = useRef<HTMLDivElement>(null);
 
    // Handle sign out
@@ -48,11 +49,67 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
       };
    }, []);
 
+   // Redirect unauthenticated users
    useEffect(() => {
       if (!isLoading && !isAuthenticated) {
          router.push('/sign-in');
       }
    }, [isLoading, isAuthenticated, router]);
+
+   // Enhanced role-based routing with security checks
+   useEffect(() => {
+      if (user && isAuthenticated && !hasRedirected) {
+         const currentPath = window.location.pathname;
+         
+         // Define role-based route mappings
+         const roleRoutes = {
+            masteradmin: '/profile/masteradmin',
+            authority: '/profile/authority',
+            citizen: '/profile/posts'
+         };
+
+         // Get the correct route for user's role
+         const correctRoute = roleRoutes[user.role as keyof typeof roleRoutes];
+         
+         if (!correctRoute) {
+            console.error('Invalid user role:', user.role);
+            return;
+         }
+
+         // Check if user is trying to access unauthorized routes
+         const isUnauthorizedAccess = () => {
+            switch (user.role) {
+               case 'masteradmin':
+                  // Master admin can only access their dashboard
+                  return !currentPath.includes('/profile/masteradmin') && currentPath !== '/profile';
+               
+               case 'authority':
+                  // Authority can only access their dashboard
+                  return !currentPath.includes('/profile/authority') && currentPath !== '/profile';
+               
+               case 'citizen':
+                  // Citizens cannot access admin/authority routes
+                  return currentPath.includes('/masteradmin') || 
+                         currentPath.includes('/authority') || 
+                         currentPath === '/profile';
+               
+               default:
+                  return true;
+            }
+         };
+
+         // Redirect if unauthorized access or if on base /profile route
+         if (isUnauthorizedAccess() || currentPath === '/profile') {
+            setHasRedirected(true);
+            router.replace(correctRoute);
+         }
+      }
+   }, [user, isAuthenticated, hasRedirected, router]);
+
+   // Reset redirect flag when user changes
+   useEffect(() => {
+      setHasRedirected(false);
+   }, [user?.id]);
 
    // if (isLoading) {
    //    return (
@@ -67,6 +124,12 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
       return (
          <div className="flex flex-col items-center justify-center min-h-screen bg-black">
             <p className="text-xl font-semibold text-red-500">Error loading profile: {error}</p>
+            <button 
+               onClick={() => router.push('/sign-in')} 
+               className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+               Return to Sign In
+            </button>
          </div>
       );
    }
@@ -74,7 +137,9 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
    if (!user) return null;
 
    return (
-      <div className="min-h-screen bg-black text-white max-w-3xl mx-auto flex flex-col p-4">
+      <div className={`min-h-screen bg-black text-white flex flex-col p-4 ${
+         user.role === 'masteradmin' ? 'max-w-7xl' : 'max-w-3xl'
+      } mx-auto`}>
          {/* Fixed Header */}
          <div className="sticky top-0 bg-black/90 backdrop-blur-md z-30 px-4 py-4 border-b border-gray-800/50">
             <div className="flex items-center justify-between">
@@ -85,7 +150,10 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
                >
                   <ArrowLeft size={20} className="group-hover:text-blue-400 transition-colors" />
                </button>
-               <h1 className="text-lg font-semibold">Profile</h1>
+               <h1 className="text-lg font-semibold">
+                  {user.role === 'masteradmin' ? 'Master Admin' : 
+                   user.role === 'authority' ? 'Authority Dashboard' : 'Profile'}
+               </h1>
                <div className="relative cursor-pointer" ref={dropdownRef}>
                   <button
                      onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -134,29 +202,25 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
             <div className='bg-[#181818] rounded-t-4xl shadow-lg min-h-[calc(100vh-80px)] relative'>
 
                <div className="p-4">
-                  {/* Profile Section */}
-                  <ProfileInfo
-                     user={user}
-                     onEditProfile={handleEditProfile}
-                  />
+                  {/* Profile Section - Only show for citizens and authorities */}
+                  {user.role !== 'masteradmin' && (
+                     <ProfileInfo
+                        user={user}
+                        onEditProfile={handleEditProfile}
+                     />
+                  )}
 
                   {user.role === 'masteradmin' ? (
-                     <div className="mt-6 p-6 bg-gradient-to-br from-purple-900/20 to-purple-600/20 rounded-xl border border-purple-500/30">
-                        <h1 className="text-2xl font-bold text-purple-400 mb-2">
-                           Master Admin Profile
-                        </h1>
-                        <p className="text-gray-300">Access to all system controls and settings.</p>
+                     <div className={user.role === 'masteradmin' ? '' : 'mt-4'}>
+                        {children}
                      </div>
                   ) : user.role === 'authority' ? (
-                     <div className="mt-6 p-6 bg-gradient-to-br from-orange-900/20 to-orange-600/20 rounded-xl border border-orange-500/30">
-                        <h1 className="text-2xl font-bold text-orange-400 mb-2">
-                           Authority Profile
-                        </h1>
-                        <p className="text-gray-300">Manage civic issues and community oversight.</p>
+                     <div className="mt-4">
+                        {children}
                      </div>
                   ) : (
                      <>
-                        {/* Navigation Tabs */}
+                        {/* Navigation Tabs - Only for citizens */}
                         <div className="mt-6">
                            <ProfileNavLink />
                         </div>
